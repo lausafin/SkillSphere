@@ -1,12 +1,60 @@
 // src/skills/skills.service.ts
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Skill, SkillProgressLog, Tag } from '@prisma/client';
 
-// Use actual DTO classes
-interface CreateSkillDto { name: string; description?: string; categoryId?: number | null; currentScore?: number; maxScore?: number; ratingScaleType?: string; tags?: string[]; }
-interface UpdateSkillDto { name?: string; description?: string; categoryId?: number | null; currentScore?: number; maxScore?: number; ratingScaleType?: string; tags?: string[]; }
-interface CreateProgressLogDto { score: number; notes?: string; timeSpentMinutes?: number; timestamp?: Date; }
+// src/skills/dto/create-skill.dto.ts (New - Class)
+import {
+    IsString, IsNotEmpty, MaxLength, IsOptional, IsInt, Min, Max, IsArray, ArrayMaxSize, ValidateIf, IsNumber
+} from 'class-validator';
+import { Type } from 'class-transformer'; // For type transformation
+
+export class CreateSkillDto {
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(100)
+    name: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    description?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Type(() => Number) // Ensures incoming value is transformed to number if possible
+    categoryId?: number; // Allow undefined, handle null conversion in service if needed by Prisma
+
+    @IsOptional()
+    @IsNumber() // Use IsNumber for flexibility (allows floats if needed later) or IsInt
+    @Min(0)
+    @Type(() => Number)
+    // We might need cross-field validation for currentScore <= maxScore, often done in service or custom validator
+    currentScore?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1000) // Example max limit
+    @Type(() => Number)
+    maxScore?: number;
+
+    @IsOptional()
+    @IsString() // Could use @IsIn(['numeric', 'levels']) etc. if needed
+    ratingScaleType?: string;
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    @ArrayMaxSize(10)
+    tags?: string[];
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(2000)
+    notes?: string;
+}
 
 @Injectable()
 export class SkillsService {
@@ -47,43 +95,59 @@ export class SkillsService {
         return skill;
    }
 
-    async create(userId: number, createSkillDto: CreateSkillDto): Promise<Skill> {
-        // Verify categoryId if provided
-        if (createSkillDto.categoryId) {
-             const category = await this.prisma.category.findFirst({ where: { id: createSkillDto.categoryId, userId } });
-             if (!category) throw new ForbiddenException('Invalid category specified.');
-        }
+   async create(userId: number, createSkillDto: CreateSkillDto): Promise<Skill> {
+    // ... (category check) ...
 
-        const tagConnections = await this.connectOrCreateTags(userId, createSkillDto.tags || []);
+    const tagsToConnect = await this.connectOrCreateTags(userId, createSkillDto.tags || []);
 
-        try {
-            const skill = await this.prisma.skill.create({
-                data: {
-                    userId,
-                    name: createSkillDto.name,
-                    description: createSkillDto.description,
-                    categoryId: createSkillDto.categoryId,
-                    // Use connect with the array of { id: tagId } for the 'Tag' side
-                    tags: tagConnections.length > 0 ? {
-                        create: tagConnections.map(tag => ({ // Create entries in SkillTag join table
-                            assignedBy: `user:${userId}`, // Example assignment info
-                            tag: { // Connect to the Tag using its ID
-                                connect: { id: tag.id }
-                            }
-                        }))
-                     } : undefined, // Use create on the join table relation
-                },
-                include: { category: true, tags: { include: { tag: true } } }
-            });
-            return skill;
-        } catch (error) {
-             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                 throw new ConflictException(`Skill with name "${createSkillDto.name}" already exists.`);
-             }
-             console.error("Error creating skill:", error);
-             throw new Error("Could not create skill.");
+    try {
+        const skill = await this.prisma.skill.create({
+            data: {
+                userId,
+                name: createSkillDto.name,
+                description: createSkillDto.description,
+                categoryId: createSkillDto.categoryId,
+                currentScore: createSkillDto.currentScore ?? 0,
+                maxScore: createSkillDto.maxScore ?? 10,
+                ratingScaleType: createSkillDto.ratingScaleType ?? 'numeric',
+
+                // --- CORRECTED TAG CREATION LOGIC ---
+                tags: tagsToConnect.length > 0 ? {
+                   create: tagsToConnect.map(tag => ({ // Create entries in SkillTag join table
+                       assignedBy: `user:${userId}`, // Example assignment info
+                       tag: { // Connect to the actual Tag using its ID
+                           connect: { id: tag.id }
+                       }
+                   }))
+                } : undefined, // If no tags, do nothing
+                // --- END CORRECTION ---
+            },
+            include: { category: true, tags: { include: { tag: true } } }
+        });
+
+        // --- Create Initial Progress Log ---
+        if ((createSkillDto.currentScore ?? 0) > 0 || createSkillDto.notes) {
+             await this.prisma.skillProgressLog.create({
+                 data: {
+                     skillId: skill.id,
+                     score: skill.currentScore,
+                     notes: createSkillDto.notes || 'Initial score set.',
+                     timestamp: new Date(),
+                 }
+             });
         }
+        return skill;
+
+    } catch (error) {
+         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+             throw new ConflictException(`Skill with name "${createSkillDto.name}" already exists.`);
+         }
+         // Use InternalServerErrorException for better HTTP status code
+         console.error("Error creating skill:", error);
+         // Throw specific NestJS exception
+         throw new InternalServerErrorException("Could not create skill.");
     }
+}
 
     async findAll(userId: number): Promise<Skill[]> {
         return this.prisma.skill.findMany({
@@ -127,11 +191,19 @@ export class SkillsService {
              if (!category) throw new ForbiddenException('Invalid category specified.');
         }
 
-        // Handle tag updates
-        let tagUpdateOperation = undefined;
+        // Handle tag updates using explicit deleteMany + create (more reliable than 'set' sometimes)
+        let tagUpdateOperations = undefined;
         if (updateSkillDto.tags !== undefined) { // Check if tags array is provided (even if empty)
-             const newTagConnections = await this.connectOrCreateTags(userId, updateSkillDto.tags);
-             tagUpdateOperation = { set: newTagConnections || [] }; // Use set to replace existing tags
+            const tagsToSet = await this.connectOrCreateTags(userId, updateSkillDto.tags);
+            tagUpdateOperations = {
+                // Delete existing join records first
+                deleteMany: {}, // Delete all existing SkillTag entries for this skill
+                // Then create the new ones
+                create: tagsToSet.map(tag => ({
+                    assignedBy: `user:${userId}`, // Example
+                    tag: { connect: { id: tag.id } }
+                }))
+            };
         }
 
         try {
@@ -140,18 +212,19 @@ export class SkillsService {
                 data: {
                     name: updateSkillDto.name,
                     description: updateSkillDto.description,
-                    categoryId: updateSkillDto.categoryId, // Handles null correctly
+                    categoryId: updateSkillDto.categoryId, // Handles null correctly if DTO allows
                     currentScore: updateSkillDto.currentScore,
                     maxScore: updateSkillDto.maxScore,
                     ratingScaleType: updateSkillDto.ratingScaleType,
-                    tags: tagUpdateOperation, // Apply tag update operation if defined
-                     // updatedAt automatically updated by Prisma
+                    // Apply tag operations only if defined
+                    tags: tagUpdateOperations,
                 },
-                 include: { category: true, tags: { include: { tag: true } } }
+                include: { category: true, tags: { include: { tag: true } } }
             });
         } catch (error) {
-             console.error("Error updating skill:", error);
-             throw new Error("Could not update skill.");
+            console.error("Error updating skill:", error);
+            // Throw specific NestJS exception
+            throw new InternalServerErrorException("Could not update skill.");
         }
     }
 
@@ -162,7 +235,7 @@ export class SkillsService {
             await this.prisma.skill.delete({ where: { id } });
         } catch (error) {
              console.error("Error deleting skill:", error);
-             throw new Error("Could not delete skill.");
+             throw new InternalServerErrorException("Could not delete skill.");
         }
     }
 
@@ -199,7 +272,7 @@ export class SkillsService {
             });
         } catch (error) {
             console.error("Error adding progress log:", error);
-            throw new Error("Could not add progress log.");
+            throw new InternalServerErrorException("Could not add progress log.");
         }
     }
 
