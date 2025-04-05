@@ -1,0 +1,4 @@
+{
+    "extends": "./tsconfig.json", // Inherits settings from the main tsconfig
+    "exclude": ["node_modules", "test", "dist", "**/*spec.ts"] // Excludes test files and node_modules from the build output
+  }
