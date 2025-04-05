@@ -31,6 +31,6 @@ async function bootstrap() {
 
   // Start listening for connections
   await app.listen(port);
-  console.log(`🚀 Skill Sphere Backend is running on: http://localhost:${port}`);
+  
 }
 bootstrap();
