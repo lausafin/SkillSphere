@@ -3,58 +3,11 @@ import { Injectable, NotFoundException, ForbiddenException, ConflictException, I
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Skill, SkillProgressLog, Tag } from '@prisma/client';
 
-// src/skills/dto/create-skill.dto.ts (New - Class)
-import {
-    IsString, IsNotEmpty, MaxLength, IsOptional, IsInt, Min, Max, IsArray, ArrayMaxSize, ValidateIf, IsNumber
-} from 'class-validator';
-import { Type } from 'class-transformer'; // For type transformation
-
-export class CreateSkillDto {
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(100)
-    name: string;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(500)
-    description?: string;
-
-    @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Type(() => Number) // Ensures incoming value is transformed to number if possible
-    categoryId?: number; // Allow undefined, handle null conversion in service if needed by Prisma
-
-    @IsOptional()
-    @IsNumber() // Use IsNumber for flexibility (allows floats if needed later) or IsInt
-    @Min(0)
-    @Type(() => Number)
-    // We might need cross-field validation for currentScore <= maxScore, often done in service or custom validator
-    currentScore?: number;
-
-    @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Max(1000) // Example max limit
-    @Type(() => Number)
-    maxScore?: number;
-
-    @IsOptional()
-    @IsString() // Could use @IsIn(['numeric', 'levels']) etc. if needed
-    ratingScaleType?: string;
-
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    @ArrayMaxSize(10)
-    tags?: string[];
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(2000)
-    notes?: string;
-}
+// --- Import the DTO Classes ---
+import { CreateSkillDto } from './dto/create-skill.dto'; // Assuming this class exists too
+import { UpdateSkillDto } from './dto/update-skill.dto';
+import { CreateProgressLogDto } from './dto/create-progress-log.dto';
+// --- Remove old interface definitions if they are still here ---
 
 @Injectable()
 export class SkillsService {

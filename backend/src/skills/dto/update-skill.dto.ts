@@ -1,49 +1,50 @@
 // src/skills/dto/update-skill.dto.ts
+import {
+    IsString, IsOptional, MaxLength, IsInt, Min, Max, IsArray, ArrayMaxSize, ValidateIf, IsNumber, IsNotEmpty
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ArrayMaxSize, ValidateIf } from 'class-validator';
 
 export class UpdateSkillDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty() // Don't allow empty string if name is provided
-  @MaxLength(100)
-  name?: string;
+    @IsOptional()
+    @IsString()
+    @IsNotEmpty() // Don't allow empty string if name is provided
+    @MaxLength(100)
+    name?: string;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  // Allow explicitly setting description to null or empty string to clear it
-  description?: string | null;
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    description?: string;
 
-  @IsOptional()
-  // Allow null to unset the category
-  @ValidateIf((object, value) => value !== null) // Only validate if not null
-  @IsInt()
-  @Min(1)
-  @Type(() => Number)
-  categoryId?: number | null;
+    // Allow null explicitly for unsetting, or undefined for no change
+    @IsOptional()
+    @ValidateIf((object, value) => value !== null) // Only validate if not explicitly null
+    @IsInt()
+    @Min(1)
+    @Type(() => Number)
+    categoryId?: number | null; // Allow null to be passed to unset
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  // Max validation depends on maxScore
-  @Type(() => Number)
-  currentScore?: number;
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    // Add @Max based on related maxScore? Requires custom validator or service logic check
+    @Type(() => Number)
+    currentScore?: number;
 
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  @Type(() => Number)
-  maxScore?: number;
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1000)
+    @Type(() => Number)
+    maxScore?: number;
 
-  @IsOptional()
-  @IsString()
-  ratingScaleType?: string;
+    @IsOptional()
+    @IsString()
+    ratingScaleType?: string;
 
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @ArrayMaxSize(10)
-  tags?: string[];
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    @ArrayMaxSize(10)
+    tags?: string[];
 }
