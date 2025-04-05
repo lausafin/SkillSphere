@@ -1,8 +1,12 @@
 // src/auth/auth.controller.ts
-import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+    Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus,
+    UsePipes, ValidationPipe // Added for potential DTO validation
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard'; // Ensure correct path
-// Use actual DTO classes with validation in a real project
+import { JwtAuthGuard } from './guards/jwt-auth.guard'; // Corrected path assumption
+
+// Import actual DTO classes if created
 // import { RegisterDto } from './dto/register.dto';
 // import { LoginDto } from './dto/login.dto';
 
@@ -16,23 +20,27 @@ export class AuthController {
 
     @Post('login')
     @HttpCode(HttpStatus.OK)
+    // Apply validation pipe if using DTO classes with decorators
+    // @UsePipes(new ValidationPipe({ whitelist: true }))
     async login(@Body() loginDto: LoginDto) {
-        // Validation should be handled by DTOs/Pipes
+        // Service now throws UnauthorizedException on failure
         return this.authService.login(loginDto);
     }
 
     @Post('register')
     @HttpCode(HttpStatus.CREATED)
+     // Apply validation pipe if using DTO classes with decorators
+    // @UsePipes(new ValidationPipe({ whitelist: true }))
     async register(@Body() registerDto: RegisterDto) {
-        // Validation should be handled by DTOs/Pipes
+        // Service now throws ConflictException or InternalServerErrorException on failure
         return this.authService.register(registerDto);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('profile')
     getProfile(@Request() req) {
-        // req.user is populated by JwtStrategy.validate
-        const userId = req.user.userId; // Ensure payload structure matches
+        const userId = req.user.userId;
+        // Service now throws NotFoundException if user mysteriously disappears
         return this.authService.getProfile(userId);
     }
 }
