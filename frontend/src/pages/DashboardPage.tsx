@@ -171,14 +171,14 @@ const DashboardPage: React.FC = () => {
     // Use already sorted skills if sort order is guaranteed, otherwise sort here
     const recentlyUpdated = [...skills].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
 
-    // --- Render ---
-    return (
+     // --- Render ---
+     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h4" gutterBottom> Welcome back, {user?.name || user?.email}! </Typography>
 
             {isLoading ? <CircularProgress sx={{ display: 'block', margin: 'auto' }} /> : error ? <Alert severity="error">{error}</Alert> : (
                 <Grid container spacing={3}>
-                    {/* Row 1: Summary Cards & Recent List */}
+                    {/* --- Row 1: Summary & Recent --- */}
                     <Grid item xs={12} sm={6} md={4}>
                         <Paper elevation={2} sx={{ p: 2, textAlign: 'center', height: '100%' }}>
                              <Typography variant="h6">Total Skills</Typography>
@@ -197,19 +197,25 @@ const DashboardPage: React.FC = () => {
                          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
                              <Typography variant="h6" gutterBottom>Recently Updated</Typography>
                              {recentlyUpdated.length === 0 ? <Typography color="textSecondary">No skills tracked yet.</Typography> : (
-                                 <List dense>
-                                     {recentlyUpdated.map(skill => (
-                                         <ListItem key={skill.id} disablePadding>
-                                             <ListItemText primary={skill.name} secondary={`Score: ${skill.currentScore}/${skill.maxScore}`} />
-                                         </ListItem>
-                                     ))}
-                                 </List>
+                                 <List dense> {recentlyUpdated.map(skill => ( <ListItem key={skill.id} disablePadding> <ListItemText primary={skill.name} secondary={`Score: ${skill.currentScore}/${skill.maxScore}`} /> </ListItem> ))} </List>
                              )}
                          </Paper>
                      </Grid>
 
-                    {/* Row 2: Charts */}
-                     <Grid item xs={12} lg={8}> {/* Multi-line chart takes more space */}
+                    {/* --- Row 2: Pie & Radar --- */}
+                     <Grid item xs={12} md={6}> {/* Pie takes half width on medium screens */}
+                        <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                            <CategoryPieChart data={categoryPieChartData} title="Skills by Category" />
+                         </Paper>
+                     </Grid>
+                     <Grid item xs={12} md={6}> {/* Radar takes other half */}
+                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                             <SkillRadarChart data={radarChartData} title="Recent Skill Snapshot"/>
+                         </Paper>
+                     </Grid>
+
+                     {/* --- Row 3: Multi-Skill Progress --- */}
+                     <Grid item xs={12}> {/* Full width */}
                          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
                              <MultiSkillProgressChart
                                  data={multiSkillChartProcessedData.data}
@@ -218,18 +224,7 @@ const DashboardPage: React.FC = () => {
                              />
                          </Paper>
                      </Grid>
-                     <Grid item container xs={12} lg={4} spacing={3} direction="column"> {/* Column for Pie and Radar */}
-                         <Grid item xs>
-                            <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                                <CategoryPieChart data={categoryPieChartData} title="Skills by Category" />
-                             </Paper>
-                         </Grid>
-                         <Grid item xs>
-                            <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                                <SkillRadarChart data={radarChartData} title="Recent Skill Snapshot"/>
-                            </Paper>
-                         </Grid>
-                     </Grid>
+
                 </Grid>
             )}
         </Box>
