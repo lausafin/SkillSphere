@@ -1,7 +1,7 @@
 // src/components/SkillProgressChart.tsx
 import React from 'react';
 import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Label
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Label
 } from 'recharts';
 import { Box, Typography, useTheme } from '@mui/material';
 
