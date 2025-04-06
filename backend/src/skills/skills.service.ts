@@ -102,10 +102,18 @@ export class SkillsService {
     }
 }
 
+    // Example Backend skills.service.ts modification (findAll method)
     async findAll(userId: number): Promise<Skill[]> {
         return this.prisma.skill.findMany({
             where: { userId },
-            include: { category: true, tags: { include: { tag: true } } },
+            include: {
+                category: true,
+                tags: { include: { tag: true } },
+                progressLogs: { // <-- INCLUDE LOGS (INEFFICIENT FOR DASHBOARD)
+                    orderBy: { timestamp: 'desc' }, // Maybe limit number of logs?
+                    // take: 10 // Example: Limit logs fetched per skill
+                }
+            },
             orderBy: { updatedAt: 'desc' },
         });
     }

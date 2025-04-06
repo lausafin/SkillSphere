@@ -14,18 +14,27 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History'; // For viewing progress log
 
-// Define the structure of a Skill object expected by this component
+// Define Log data structure (can also be defined globally or imported)
+interface ProgressLogData {
+    id: number;
+    timestamp: string; // ISO Date string
+    score: number;
+    notes?: string | null;
+    timeSpentMinutes?: number | null;
+}
+
+// Update SkillData interface
 export interface SkillData {
     id: number;
     name: string;
     description?: string | null;
     currentScore: number;
     maxScore: number;
-    ratingScaleType: string; // 'numeric', 'levels', etc.
-    updatedAt: string; // ISO date string
+    ratingScaleType: string;
+    updatedAt: string;
     category?: { id: number; name: string } | null;
-    // Ensure API returns tags in this nested structure or adjust accordingly
     tags?: { tag: { id: number; name: string } }[];
+    progressLogs?: ProgressLogData[]; // <-- ADD THIS LINE
 }
 
 interface SkillCardProps {
