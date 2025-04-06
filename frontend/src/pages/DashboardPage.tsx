@@ -214,16 +214,15 @@ const DashboardPage: React.FC = () => {
                          </Paper>
                      </Grid>
 
-                    /* --- Row 3: Multi-Skill Progress --- */}
-                    <Grid item xs={12} md={8} lg={6}> {/* Adjust width: full on small, narrower on medium/large */}
-                        <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                            <MultiSkillProgressChart
-                                data={multiSkillChartProcessedData.data}
-                                skillKeys={multiSkillChartProcessedData.keys}
-                                title="Skill Progress Over Last Year (%)"
-                            />
-                        </Paper>
-                    </Grid>
+                     {/* --- Row 3: Multi-Skill Progress --- */}
+                     <Grid item xs={12} md={8} lg={6}> {/* Full width */}
+                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                             <MultiSkillProgressChart
+                                 data={multiSkillChartProcessedData.data}
+                                 skillKeys={multiSkillChartProcessedData.keys}
+                                 title="Skill Progress Over Last Year (%)"
+                             />
+                         </Paper>
                      </Grid>
 
                 </Grid>
