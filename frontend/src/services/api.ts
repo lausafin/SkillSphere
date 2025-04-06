@@ -34,6 +34,7 @@ export interface CreateProgressLogDto { score: number; notes?: string; timeSpent
 export interface ProgressLogData { id: number; timestamp: string; score: number; notes?: string | null; timeSpentMinutes?: number | null; /* evidence?: any[]; */ }
 export interface Category { id: number; name: string; }
 export interface CreateCategoryDto { name: string; }
+export interface UpdateCategoryDto { name: string; }
 export interface Tag { id: number; name: string; }
 
 // --- Authentication API ---
@@ -92,7 +93,17 @@ export const createCategory = async (data: CreateCategoryDto): Promise<Category>
     const response = await apiClient.post<Category>('/categories', data);
     return response.data;
 };
-// Add update/delete category functions if needed
+
+// NEW: Update Category
+export const updateCategory = async (id: number, data: UpdateCategoryDto): Promise<Category> => {
+    const response = await apiClient.patch<Category>(`/categories/${id}`, data);
+    return response.data;
+};
+
+// NEW: Delete Category
+export const deleteCategory = async (id: number): Promise<void> => {
+    await apiClient.delete(`/categories/${id}`);
+};
 
 // --- Tags API ---
 export const fetchTags = async (): Promise<Tag[]> => {

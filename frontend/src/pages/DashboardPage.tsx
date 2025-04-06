@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchSkills } from '../services/api';
 import { SkillData } from '../components/SkillCard';
 import SkillRadarChart from '../components/SkillRadarChart'; // Import the new chart component
+import CategoryPieChart from '../components/CategoryPieChart'; // Import Pie Chart
 
 const DashboardPage: React.FC = () => {
     const { user } = useAuth();
@@ -20,6 +21,35 @@ const DashboardPage: React.FC = () => {
             .catch(err => { console.error(err); setError('Failed to load dashboard data.'); })
             .finally(() => setIsLoading(false));
     }, []);
+
+
+     // --- Prepare data for Pie Chart (Category Distribution) ---
+    const categoryPieChartData = useMemo(() => {
+        if (!skills || skills.length === 0) return [];
+
+        const counts: { [key: string]: number } = {};
+        let uncategorizedCount = 0;
+
+        skills.forEach(skill => {
+            if (skill.category && skill.category.name) {
+                counts[skill.category.name] = (counts[skill.category.name] || 0) + 1;
+            } else {
+                uncategorizedCount++;
+            }
+        });
+
+        const pieData = Object.entries(counts).map(([name, value]) => ({ name, value }));
+
+        if (uncategorizedCount > 0) {
+            pieData.push({ name: 'Uncategorized', value: uncategorizedCount });
+        }
+
+        // Optional: Sort slices for consistency, e.g., by value descending
+        pieData.sort((a, b) => b.value - a.value);
+
+        return pieData;
+    }, [skills]); // Recalculate when skills change
+
 
     // --- Prepare data for Radar Chart ---
     // Example: Use top 5-7 most recently updated skills for the chart
@@ -42,7 +72,7 @@ const DashboardPage: React.FC = () => {
     // --- Other calculations ---
     const totalSkills = skills.length;
     const averageScore = totalSkills > 0 ? (skills.reduce((sum, skill) => sum + (skill.maxScore > 0 ? (skill.currentScore / skill.maxScore) : 0), 0) / totalSkills * 10) : 0;
-    const recentlyUpdated = skills.slice(0, 5); // Assuming skills are already sorted by updatedAt desc from API/filter logic
+    const recentlyUpdated = [...skills].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
 
     return (
         <Box sx={{ p: 3 }}>
@@ -56,28 +86,24 @@ const DashboardPage: React.FC = () => {
 
                      {/* Recently Updated List */}
                      <Grid item xs={12} md={4}>
-                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                             <Typography variant="h6" gutterBottom>Recently Updated</Typography>
-                             {recentlyUpdated.length === 0 ? <Typography color="textSecondary">No skills tracked yet.</Typography> : ( <List dense> {recentlyUpdated.map(skill => ( <ListItem key={skill.id} disablePadding> <ListItemText primary={skill.name} secondary={`Score: ${skill.currentScore}/${skill.maxScore}`} /> </ListItem> ))} </List> )}
-                         </Paper>
+                        <Paper elevation={2} sx={{ p: 2, height: '100%' }}> <Typography variant="h6" gutterBottom>Recently Updated</Typography> {recentlyUpdated.length === 0 ? <Typography color="textSecondary">No skills tracked yet.</Typography> : ( <List dense> {recentlyUpdated.map(skill => ( <ListItem key={skill.id} disablePadding> <ListItemText primary={skill.name} secondary={`Score: ${skill.currentScore}/${skill.maxScore}`} /> </ListItem> ))} </List> )} </Paper>
                      </Grid>
 
-                    {/* NEW: Radar Chart */}
-                     <Grid item xs={12} md={6}> {/* Adjust grid size as needed */}
-                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                             {/* Pass the processed data to the chart component */}
-                             <SkillRadarChart
-                                data={radarChartData}
-                                title="Recent Skill Snapshot"
-                             />
-                         </Paper>
-                     </Grid>
-
-                      {/* Placeholder for other charts/widgets */}
+                    {/* Radar Chart */}
                      <Grid item xs={12} md={6}>
+                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                             <SkillRadarChart data={radarChartData} title="Recent Skill Snapshot"/>
+                         </Paper>
+                     </Grid>
+
+                      {/* NEW: Pie Chart */}
+                     <Grid item xs={12} md={6}> {/* Adjust grid size */}
                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                           <Typography variant="h6">Category Overview</Typography>
-                           <Typography color="textSecondary">(Pie chart coming soon...)</Typography>
+                            {/* Pass the processed category data */}
+                            <CategoryPieChart
+                                data={categoryPieChartData}
+                                title="Skills by Category"
+                            />
                          </Paper>
                      </Grid>
 

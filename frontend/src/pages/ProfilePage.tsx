@@ -1,18 +1,22 @@
 // src/pages/ProfilePage.tsx
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, TextField, Button, CircularProgress, Alert } from '@mui/material';
+// Removed Alert, Divider from import - Keep others
+import { Box, Typography, Paper, TextField, Button, CircularProgress } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
-// Assume API function exists - needs implementation in api.ts and backend
-// import { updateUserProfile } from '../services/api';
-// Assume AuthContext has an updateUser function - needs implementation
-// const { user, isLoading: authLoading, updateUser } = useAuth();
+import ManageCategoriesModal from '../components/ManageCategoriesModal'; // Import the modal
 
 const ProfilePage: React.FC = () => {
     const { user, isLoading: authLoading } = useAuth(); // Get user and loading state
     const [name, setName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    // Removed unused error and success state variables for profile update,
+    // as the actual update logic is currently placeholder.
+    // Add them back when implementing the actual API call and feedback.
+    // const [error, setError] = useState<string | null>(null);
+    // const [success, setSuccess] = useState<string | null>(null);
+
+
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
     // Initialize name state when user data is available
     useEffect(() => {
@@ -24,36 +28,79 @@ const ProfilePage: React.FC = () => {
 
     const handleSave = async () => {
          if (!user) return;
-        setIsSubmitting(true); setError(null); setSuccess(null);
+        setIsSubmitting(true);
+        // setError(null); setSuccess(null); // Remove if state variables removed
         try {
             // --- Placeholder for API call ---
             console.log("Attempting to update profile name to:", name);
             // await updateUserProfile(user.id, { name }); // 1. Call API
-            // updateUser({ ...user, name: name }); // 2. Update context state (implement this in AuthContext)
+            // updateUser({ ...user, name: name }); // 2. Update context state
              // --- End Placeholder ---
-            setSuccess('Profile update simulated! (API/Context update needed)'); // Placeholder success
-        } catch (err: any) { setError(err.response?.data?.message || 'Failed to update profile.'); }
+            // setSuccess('Profile update simulated!'); // Remove if state variables removed
+            alert('Profile update simulated! Check console.'); // Simple alert for now
+        } catch (err: any) {
+            // setError(err.response?.data?.message || 'Failed to update profile.'); // Remove if state variable removed
+            alert('Failed to simulate profile update.'); // Simple alert for now
+            console.error("Profile save error (simulated):", err);
+        }
         finally { setIsSubmitting(false); }
     };
 
-    if (authLoading || !user) { /* ... Loading spinner ... */
-        return <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />;
+    const handleManageCategories = () => {
+        setIsCategoryModalOpen(true);
+    };
+
+    const handleCloseCategoryModal = (categoriesChanged?: boolean) => {
+        setIsCategoryModalOpen(false);
+        if (categoriesChanged) {
+            console.log("Categories were updated.");
+            // You might add a Snackbar notification here later
+        }
+    };
+
+    // Display loading spinner while auth state is loading or user isn't available yet
+    if (authLoading || !user) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)">
+                 <CircularProgress />
+            </Box>
+        );
     }
 
     return (
-        <Box sx={{ p: 3, maxWidth: 600, margin: 'auto' }}>
-            <Typography variant="h4" gutterBottom>My Profile</Typography>
-            <Paper elevation={2} sx={{ p: 3 }}>
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-                <TextField fullWidth margin="normal" label="Email Address" value={user.email} disabled variant="filled" />
-                <TextField fullWidth margin="normal" label="Name" value={name} onChange={(e) => setName(e.target.value)} disabled={isSubmitting} />
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}> (Password change functionality coming soon...) </Typography>
-                <Button variant="contained" sx={{ mt: 3 }} onClick={handleSave} disabled={isSubmitting || name === (user.name || '')}>
-                    {isSubmitting ? <CircularProgress size={24} /> : 'Save Changes'}
-                </Button>
-            </Paper>
-        </Box>
+        <>
+            <Box sx={{ p: 3, maxWidth: 600, margin: 'auto' }}>
+                <Typography variant="h4" gutterBottom>My Profile</Typography>
+                <Paper elevation={2} sx={{ p: 3, mb: 3 }}> {/* Profile Section */}
+                    {/* Removed Alert components for error/success as they were tied to unused state */}
+                    <TextField fullWidth margin="normal" label="Email Address" value={user.email} disabled variant="filled" />
+                    <TextField fullWidth margin="normal" label="Name" value={name} onChange={(e) => setName(e.target.value)} disabled={isSubmitting} />
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}> (Password change functionality coming soon...) </Typography>
+                    <Button variant="contained" sx={{ mt: 3 }} onClick={handleSave} disabled={isSubmitting || name === (user.name || '')}>
+                        {isSubmitting ? <CircularProgress size={24} /> : 'Save Profile Changes'}
+                    </Button>
+                </Paper>
+
+                <Typography variant="h5" gutterBottom>Settings</Typography>
+                <Paper elevation={2} sx={{ p: 3 }}> {/* Settings Section */}
+                     <Typography variant="h6" gutterBottom>Categories</Typography>
+                     <Typography variant="body2" color="textSecondary" sx={{mb: 2}}>
+                         Organize your skills by adding custom categories.
+                     </Typography>
+                     <Button variant="outlined" onClick={handleManageCategories}>
+                        Manage Categories
+                    </Button>
+                     {/* Removed unused Divider import */}
+                 </Paper>
+            </Box>
+
+            {/* Category Management Modal */}
+            <ManageCategoriesModal
+                open={isCategoryModalOpen}
+                onClose={handleCloseCategoryModal}
+            />
+        </>
     );
 };
+
 export default ProfilePage;
