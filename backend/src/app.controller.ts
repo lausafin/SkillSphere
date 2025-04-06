@@ -1,20 +1,22 @@
 // backend/src/app.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
 import { AppService } from './app.service';
 
-@Controller() // No prefix, applies to the root path
+@Controller() // Root path or a specific prefix if desired
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get() // Handles GET requests to the root path '/'
+  @Get() // Keep existing root GET if you have one
   getHello(): string {
     return this.appService.getHello();
   }
 
-  // You might add other root-level endpoints here if needed,
-  // like a health check:
-  // @Get('health')
-  // getHealth(): { status: string } {
-  //   return { status: 'ok' };
-  // }
+  // --- NEW Keep-Alive Endpoint ---
+  @Get('health') // Or '/ping', '/keep-alive', etc.
+  @HttpCode(HttpStatus.OK) // Explicitly set OK status
+  getHealthStatus() {
+    // No complex logic needed, just confirm the server is responsive
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+  // --- End Keep-Alive Endpoint ---
 }
