@@ -1,86 +1,148 @@
-// schema.prisma
+// backend/prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql" // Or "mysql", "sqlite", etc.
+  provider = "postgresql" // Or your chosen provider
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  email         String   @unique
-  passwordHash  String
-  name          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  skills        Skill[]
-  categories    Category[]
-  tags          Tag[]
+  // Team Relations
+  ownedTeams  Team[]           @relation("OwnedTeams")
+  memberships TeamMembership[]
+
+  // Skill/Log Relations
+  authoredSkills Skill[]            @relation("AuthoredSkills")
+  progressLogs   SkillProgressLog[]
+
+  // External Auth
   authProviders AuthProvider[]
+
+  // --- ADD THESE TWO LINES ---
+  categories Category[] // Relation back from Category
+  tags       Tag[] // Relation back from Tag
+  // --- END ADDITION ---
 }
 
 model AuthProvider {
   id           Int    @id @default(autoincrement())
   userId       Int
-  providerName String // e.g., 'google', 'github'
-  providerId   String // User's ID from the provider
+  providerName String
+  providerId   String
   user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerName, providerId])
 }
 
+// --- NEW: Team Model ---
+model Team {
+  id        Int      @id @default(autoincrement())
+  name      String
+  ownerId   Int // ID of the user who created/owns the team
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User             @relation("OwnedTeams", fields: [ownerId], references: [id], onDelete: Cascade) // Relation back to owner
+  members TeamMembership[] // List of members (through join table)
+  skills  Skill[] // Skills defined within this team
+
+  // Ensure team names are unique per owner? Or globally? Let's start with per owner.
+  @@unique([ownerId, name])
+}
+
+// --- NEW: Team Membership (Join Table) ---
+model TeamMembership {
+  userId   Int
+  teamId   Int
+  role     String   @default("MEMBER") // e.g., "LEADER", "MEMBER" (Could be Enum later)
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([userId, teamId]) // User can only be in a team once
+}
+
 model Skill {
   id              Int      @id @default(autoincrement())
-  userId          Int
   name            String
   description     String?
-  categoryId      Int?     // Nullable Foreign Key
+  categoryId      Int?
   currentScore    Int      @default(0)
   maxScore        Int      @default(10)
   ratingScaleType String   @default("numeric")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull) // Set categoryId to NULL if Category is deleted
-  progressLogs    SkillProgressLog[]
-  goals           Goal[]
-  tags            SkillTag[] // Many-to-many relation through SkillTag
+  // --- MODIFIED: Skill Ownership ---
+  // A skill belongs EITHER to a user OR a team
+  userId Int? // Nullable: For personal skills
+  teamId Int? // Nullable: For team skills
 
-  @@unique([userId, name])
+  // Relations
+  user         User?              @relation("AuthoredSkills", fields: [userId], references: [id], onDelete: Cascade) // Link to personal skill author
+  team         Team?              @relation(fields: [teamId], references: [id], onDelete: Cascade) // Link to team skill owner
+  category     Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  progressLogs SkillProgressLog[]
+  goals        Goal[]
+  tags         SkillTag[]
+
+  // Constraint: Ensure either userId or teamId is set, but not both (handled in service logic)
+  // Constraint: Ensure skill name is unique within its scope (per user OR per team)
+  @@unique([userId, name]) // Unique personal skill name per user
+  @@unique([teamId, name]) // Unique team skill name per team
 }
 
 model Category {
   id     Int     @id @default(autoincrement())
   userId Int
   name   String
-  skills Skill[] // Relation back to skills
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills Skill[]
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade) // This side is correct
+
+  @@unique([userId, name])
+}
+
+model Tag {
+  id     Int        @id @default(autoincrement())
+  userId Int
+  name   String
+  skills SkillTag[]
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade) // This side is correct
 
   @@unique([userId, name])
 }
 
 model SkillProgressLog {
-  id                Int      @id @default(autoincrement())
-  skillId           Int
-  timestamp         DateTime @default(now())
-  score             Int
-  notes             String?
-  timeSpentMinutes  Int?
-  createdAt         DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  skillId          Int
+  // --- ADDED/MODIFIED: Link log to the user who made it ---
+  userId           Int // ID of the user who logged this progress
+  timestamp        DateTime @default(now())
+  score            Int
+  notes            String?
+  timeSpentMinutes Int?
+  createdAt        DateTime @default(now())
 
-  skill             Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
-  evidence          SkillEvidence[]
+  skill    Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade) // Relation to user who logged
+  evidence SkillEvidence[]
 }
 
 model SkillEvidence {
   id          Int      @id @default(autoincrement())
   logId       Int
-  type        String   // 'link', 'file', 'text'
+  type        String // 'link', 'file', 'text'
   value       String
   description String?
   createdAt   DateTime @default(now())
@@ -89,30 +151,20 @@ model SkillEvidence {
 }
 
 model Goal {
-  id           Int      @id @default(autoincrement())
-  skillId      Int
-  targetScore  Int
-  targetDate   DateTime?
-  status       String   @default("active") // 'active', 'achieved', 'missed'
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          Int       @id @default(autoincrement())
+  skillId     Int
+  targetScore Int
+  targetDate  DateTime?
+  status      String    @default("active") // 'active', 'achieved', 'missed'
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 }
 
-model Tag {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  name      String
-  skills    SkillTag[] // Relation through join table
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, name])
-}
-
 model SkillTag {
-  skillId   Int
-  tagId     Int
+  skillId    Int
+  tagId      Int
   assignedAt DateTime @default(now())
   // assignedBy String // Optional: Track who assigned
 
