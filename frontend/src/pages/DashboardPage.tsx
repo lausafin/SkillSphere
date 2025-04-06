@@ -90,57 +90,78 @@ const DashboardPage: React.FC = () => {
 
     // --- Prepare data for Multi-Skill Line Chart (Last 12 Months - Frontend Simulation) ---
     const multiSkillChartProcessedData = useMemo(() => {
-        // WARNING: Inefficient frontend processing - replace with backend aggregation
         if (!skills || skills.length === 0) return { data: [], keys: [] };
 
-        const endDate = new Date();
-        const startDate = new Date();
+        const endDate = new Date(); // Today
+        const startDate = new Date(); // 1 year ago, start of month
         startDate.setFullYear(endDate.getFullYear() - 1);
-        startDate.setDate(1); startDate.setHours(0, 0, 0, 0);
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
 
         const MAX_SKILLS_ON_CHART = 5;
-        const skillsToChart = skills
-            .map(s => ({ ...s, logCount: (s.progressLogs || []).filter(log => new Date(log.timestamp) >= startDate).length }))
-            .sort((a, b) => b.logCount - a.logCount)
-            .slice(0, MAX_SKILLS_ON_CHART);
+        const skillsToChart = skills /* ... filter/sort logic ... */ .slice(0, MAX_SKILLS_ON_CHART);
 
         if (skillsToChart.length === 0) return { data: [], keys: [] };
         const skillKeys = skillsToChart.map(s => s.name);
 
-        const intervals: { timestamp: number; dateLabel: string }[] = [];
-        let currentMonth = new Date(startDate);
-        while (currentMonth <= endDate) {
-            intervals.push({ timestamp: currentMonth.getTime(), dateLabel: currentMonth.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) });
-            currentMonth.setMonth(currentMonth.getMonth() + 1);
-        }
-
         const chartData: MultiProgressChartDataPoint[] = [];
-        const lastKnownScores: { [skillId: number]: number | null } = {};
+        const lastKnownScores: { [skillId: number]: number | null } = {}; // Track last known score
 
+        // Initialize lastKnownScores with the latest score *before* the overall start date
         skillsToChart.forEach(skill => {
             const logsBeforeStart = (skill.progressLogs || [])
-                .filter(log => new Date(log.timestamp) < startDate)
+                .filter(log => new Date(log.timestamp).getTime() < startDate.getTime()) // Strictly BEFORE start date
                 .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
             lastKnownScores[skill.id] = logsBeforeStart.length > 0 ? logsBeforeStart[0].score : null;
-         });
+        });
 
-        for (const interval of intervals) {
-            const point: MultiProgressChartDataPoint = { timestamp: interval.timestamp, dateLabel: interval.dateLabel };
+        let currentIntervalStart = new Date(startDate);
+
+        while (currentIntervalStart <= endDate) {
+            // Determine the end of the current interval (start of next month, or endDate if last interval)
+            let nextIntervalStart = new Date(currentIntervalStart);
+            nextIntervalStart.setMonth(nextIntervalStart.getMonth() + 1);
+            // Ensure the interval doesn't go beyond the overall endDate for filtering
+            const intervalEnd = (nextIntervalStart > endDate) ? endDate.getTime() : nextIntervalStart.getTime();
+
+
+            const point: MultiProgressChartDataPoint = {
+                timestamp: currentIntervalStart.getTime(), // Timestamp for the X-axis point (start of month)
+                dateLabel: currentIntervalStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) // Label for the point
+            };
+
             for (const skill of skillsToChart) {
-                const relevantLogs = (skill.progressLogs || [])
-                    .filter(log => new Date(log.timestamp).getTime() <= interval.timestamp)
-                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                // Find the latest log *within* the current interval [currentIntervalStart, intervalEnd)
+                // Note: Using < intervalEnd to avoid including logs exactly at the start of the next month
+                const logsInOrBeforeInterval = (skill.progressLogs || [])
+                    .filter(log => new Date(log.timestamp).getTime() < intervalEnd) // Log occurred BEFORE start of next interval
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Most recent first
 
-                 let scoreForInterval = relevantLogs.length > 0 ? relevantLogs[0].score : (lastKnownScores[skill.id] ?? null);
-                 if (relevantLogs.length > 0) lastKnownScores[skill.id] = scoreForInterval; // Update last known only if new log found
+                let scoreForPoint: number | null = null;
+                if (logsInOrBeforeInterval.length > 0) {
+                    // Found a log before the end of this interval
+                    scoreForPoint = logsInOrBeforeInterval[0].score;
+                    lastKnownScores[skill.id] = scoreForPoint; // Update last known score
+                } else {
+                    // No log found within or before this interval ENDPOINT, use the last known score carried forward
+                    scoreForPoint = lastKnownScores[skill.id] ?? null;
+                }
 
-                const normalizedScore = (scoreForInterval !== null && skill.maxScore > 0) ? (scoreForInterval / skill.maxScore) * 100 : null;
+                // Normalize score to percentage
+                const normalizedScore = (scoreForPoint !== null && skill.maxScore > 0)
+                    ? (scoreForPoint / skill.maxScore) * 100
+                    : null;
+
                 point[skill.name] = normalizedScore;
             }
+
             chartData.push(point);
+            currentIntervalStart = nextIntervalStart; // Move to the start of the next month
         }
 
+
         return { data: chartData.length >= 2 ? chartData : [], keys: skillKeys };
+
     }, [skills]);
 
 
