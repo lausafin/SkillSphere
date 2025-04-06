@@ -172,7 +172,7 @@ const DashboardPage: React.FC = () => {
     const recentlyUpdated = [...skills].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
 
      // --- Render ---
-     return (
+    return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h4" gutterBottom> Welcome back, {user?.name || user?.email}! </Typography>
 
