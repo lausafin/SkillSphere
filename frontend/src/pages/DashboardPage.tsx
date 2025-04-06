@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchSkills } from '../services/api'; // Assuming fetchSkills exists
 import { SkillData } from '../components/SkillCard'; // Base SkillData type
 import SkillRadarChart from '../components/SkillRadarChart';
-import CategoryPieChart from '../components/CategoryPieChart';
+// import CategoryPieChart from '../components/CategoryPieChart';
 import MultiSkillProgressChart, { MultiProgressChartDataPoint } from '../components/MultiSkillProgressChart'; // Import multi-line chart and its data type
 
 // Define Log data structure (mirroring backend or expected structure)
@@ -74,19 +74,19 @@ const DashboardPage: React.FC = () => {
     }, [skills]);
 
     // --- Prepare data for Pie Chart (Category Distribution) ---
-    const categoryPieChartData = useMemo(() => {
-        if (!skills || skills.length === 0) return [];
-        const counts: { [key: string]: number } = {};
-        let uncategorizedCount = 0;
-        skills.forEach(skill => {
-            if (skill.category?.name) { counts[skill.category.name] = (counts[skill.category.name] || 0) + 1; }
-            else { uncategorizedCount++; }
-        });
-        const pieData = Object.entries(counts).map(([name, value]) => ({ name, value }));
-        if (uncategorizedCount > 0) { pieData.push({ name: 'Uncategorized', value: uncategorizedCount }); }
-        pieData.sort((a, b) => b.value - a.value); // Sort largest slice first
-        return pieData;
-    }, [skills]);
+    // const categoryPieChartData = useMemo(() => {
+    //     if (!skills || skills.length === 0) return [];
+    //     const counts: { [key: string]: number } = {};
+    //     let uncategorizedCount = 0;
+    //     skills.forEach(skill => {
+    //         if (skill.category?.name) { counts[skill.category.name] = (counts[skill.category.name] || 0) + 1; }
+    //         else { uncategorizedCount++; }
+    //     });
+    //     const pieData = Object.entries(counts).map(([name, value]) => ({ name, value }));
+    //     if (uncategorizedCount > 0) { pieData.push({ name: 'Uncategorized', value: uncategorizedCount }); }
+    //     pieData.sort((a, b) => b.value - a.value); // Sort largest slice first
+    //     return pieData;
+    // }, [skills]);
 
     // --- Prepare data for Multi-Skill Line Chart (Last 12 Months - Frontend Simulation) ---
     const multiSkillChartProcessedData = useMemo(() => {
@@ -203,11 +203,11 @@ const DashboardPage: React.FC = () => {
                      </Grid>
 
                     {/* --- Row 2: Pie & Radar --- */}
-                     <Grid item xs={12} md={6}> {/* Pie takes half width on medium screens */}
-                        <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                            <CategoryPieChart data={categoryPieChartData} title="Skills by Category" />
-                         </Paper>
-                     </Grid>
+                     {/* <Grid item xs={12} md={6}> Pie takes half width on medium screens */}
+                        {/* <Paper elevation={2} sx={{ p: 2, height: '100%' }}> */}
+                            {/* <CategoryPieChart data={categoryPieChartData} title="Skills by Category" /> */}
+                         {/* </Paper> */}
+                     {/* </Grid> */}
                      <Grid item xs={12} md={6}> {/* Radar takes other half */}
                          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
                              <SkillRadarChart data={radarChartData} title="Recent Skill Snapshot"/>
