@@ -98,11 +98,18 @@ const SkillRadarChart: React.FC<SkillRadarChartProps> = ({ data, title }) => {
                     {/* Add more <Radar> components here if comparing multiple data sets */}
                     {/* e.g., <Radar name="Goal Score" dataKey="goalScore" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6}/> */}
 
-                    {/* Optional Legend */}
-                    <Legend />
-
                     {/* Optional Tooltip */}
                     <Tooltip contentStyle={{ backgroundColor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}` }} />
+
+                    {/* --- MODIFIED LEGEND --- */}
+                    <Legend
+                        layout="vertical"    // Stack items vertically
+                        align="right"        // Align the legend block to the right
+                        verticalAlign="middle" // Center it vertically
+                        // Optional: Adjust position slightly if needed
+                        // wrapperStyle={{ paddingLeft: '10px' }}
+                    />
+                    {/* --- END MODIFIED LEGEND --- */}
                 </RadarChart>
             </ResponsiveContainer>
         </Box>
