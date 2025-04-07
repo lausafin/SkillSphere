@@ -82,3 +82,17 @@ export class MemberSkillHistoryDto {
      @ApiProperty({ type: [MemberSkillHistoryPointDto] })
      history: MemberSkillHistoryPointDto[];
 }
+
+import { TeamRole } from '@prisma/client';
+// Ensure TeamMemberUser is defined and exported if needed by TeamMembershipInfo
+export class TeamMemberUser extends UserProfileDto {} // Example if extending
+
+// --- ENSURE EXPORT HERE ---
+export class TeamMembershipInfo {
+    // @ApiProperty({ enum: TeamRole }) // Optional swagger
+    role: TeamRole;
+    // @ApiProperty()
+    joinedAt: string; // Changed to string as returned by service now
+    // @ApiProperty({ type: () => TeamMemberUser })
+    user: TeamMemberUser;
+}

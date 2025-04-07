@@ -5,14 +5,16 @@ import {
 } from '@nestjs/common';
 import { TeamsService } from './teams.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Corrected path
-import { Team, TeamMembership } from '@prisma/client'; // Import prisma types if needed for return types
+import { Team, TeamMembership, User, TeamRole } from '@prisma/client'; // Consolidated Prisma imports
 
 // Import DTOs - Assuming they are classes now
 import { CreateTeamDto } from './dto/create-team.dto'; // Assuming this class exists
 import { UpdateTeamDto } from './dto/update-team.dto'; // Assuming this class exists
 import { AddMemberDto } from './dto/add-member.dto';
 import { TeamDashboardDto, TeamMembershipInfo, MemberSkillHistoryDto } from './dto/team-dashboard.dto';
-import { UserTeamListItem } from '../services/api'; // Or define type locally/import from DTO
+
+// Define return type for findUserTeams based on service logic
+type UserTeamListItemDto = Team & { owner: Pick<User, 'id'|'name'|'email'>, currentUserRole: TeamRole };
 
 // Define local interface if needed for return type hints, or rely on Prisma types/DTOs
 // Example: type FullTeamDetails = (Team & { members: TeamMembershipInfo[], owner: Pick<User, 'id'|'name'|'email'>, currentUserRole: TeamRole });
@@ -31,7 +33,7 @@ create(@Request() req, @Body() createTeamDto: CreateTeamDto): Promise<Team> {
 }
 
 @Get() // Get teams the current user is a member of
-findUserTeams(@Request() req): Promise<UserTeamListItem[]> { // Use specific return type
+findUserTeams(@Request() req): Promise<UserTeamListItemDto[]> { // Use the defined type
   return this.teamsService.findUserTeams(req.user.userId);
 }
 
