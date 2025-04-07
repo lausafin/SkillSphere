@@ -197,6 +197,7 @@ const TeamDashboardPage: React.FC = () => {
     if (isLoading && !teamData) return <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />;
     if (error) return <Alert severity="error" sx={{ m: 3 }}>{error}</Alert>;
     if (!teamData) return <Typography sx={{ m: 3 }}>Team data not found or could not be loaded.</Typography>;
+    
 
     return (
         <>
@@ -275,6 +276,7 @@ const TeamDashboardPage: React.FC = () => {
                                      </Box>
                                  ) : (
                                      <Box sx={{ p: 1, cursor: 'pointer', minHeight: 380 }} onClick={() => handleChartToggle(member.id)}>
+                                        
                                          <SkillRadarChart data={getRadarDataForMember(member.id)} title={`${member.name || member.email}'s Snapshot (%)`} />
                                      </Box>
                                  )}

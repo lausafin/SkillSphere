@@ -207,7 +207,25 @@ export class TeamsService {
 
          // Get LATEST score for EACH member on EACH team skill
          const memberScoresList: MemberSkillScoreDto[] = [];
-         for (const member of members) { /* ... Same score aggregation logic as before ... */ }
+         // src/teams/teams.service.ts (Inside getTeamDashboardData loop)
+        for (const member of members) {
+            const memberId = member.id; // ID of the specific member we're checking
+            const scoresForMember: { [skillId: number]: MemberSkillScoreItemDto } = {};
+            for (const skillId of teamSkillIds) {
+                const latestLog = await this.prisma.skillProgressLog.findFirst({
+                    where: {
+                        skillId: skillId, // Correct skill
+                        userId: memberId, // <<<--- MUST filter by the specific member ID
+                    },
+                    orderBy: { timestamp: 'desc' },
+                    select: { score: true }
+                });
+                scoresForMember[skillId] = {
+                    currentScore: latestLog?.score ?? null // Use null if no log FOUND FOR THIS MEMBER/SKILL
+                };
+            }
+            memberScoresList.push({ memberId, scores: scoresForMember });
+        }
 
          const dashboardData: TeamDashboardDto = {
              teamId: teamData.id, teamName: teamData.name, owner: teamData.owner,
