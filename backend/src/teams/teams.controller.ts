@@ -1,77 +1,116 @@
 // src/teams/teams.controller.ts
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, ParseIntPipe, HttpCode, HttpStatus, UsePipes, ValidationPipe, ForbiddenException } from '@nestjs/common';
+import {
+  Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request,
+  ParseIntPipe, HttpCode, HttpStatus, UsePipes, ValidationPipe, ForbiddenException, NotFoundException
+} from '@nestjs/common';
 import { TeamsService } from './teams.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Correct path
-// Assume DTO classes: CreateTeamDto, UpdateTeamDto
-import { TeamDashboardDto } from './dto/team-dashboard.dto'; // Adjust import as necessary
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Corrected path
+import { Team, TeamMembership } from '@prisma/client'; // Import prisma types if needed for return types
 
-interface CreateTeamDto { name: string; }
-interface UpdateTeamDto { name?: string; }
+// Import DTOs - Assuming they are classes now
+import { CreateTeamDto } from './dto/create-team.dto'; // Assuming this class exists
+import { UpdateTeamDto } from './dto/update-team.dto'; // Assuming this class exists
+import { AddMemberDto } from './dto/add-member.dto';
+import { TeamDashboardDto, TeamMembershipInfo, MemberSkillHistoryDto } from './dto/team-dashboard.dto';
+import { UserTeamListItem } from '../services/api'; // Or define type locally/import from DTO
 
-@Controller('teams')
-@UseGuards(JwtAuthGuard)
+// Define local interface if needed for return type hints, or rely on Prisma types/DTOs
+// Example: type FullTeamDetails = (Team & { members: TeamMembershipInfo[], owner: Pick<User, 'id'|'name'|'email'>, currentUserRole: TeamRole });
+
+
+@Controller('api/teams') // Using global '/api' prefix from main.ts
+@UseGuards(JwtAuthGuard) // Protect all team routes
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+constructor(private readonly teamsService: TeamsService) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  // @UsePipes(new ValidationPipe({ whitelist: true })) // Enable when DTO class exists
-  create(@Request() req, @Body() createTeamDto: CreateTeamDto) {
-    // userId from JWT payload attached by guard
-    return this.teamsService.create(req.user.userId, createTeamDto);
-  }
+@Post()
+@HttpCode(HttpStatus.CREATED)
+@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true })) // Validate DTO
+create(@Request() req, @Body() createTeamDto: CreateTeamDto): Promise<Team> {
+  return this.teamsService.create(req.user.userId, createTeamDto);
+}
 
-  @Get() // Get teams the current user is a member of
-  findUserTeams(@Request() req) {
-    return this.teamsService.findUserTeams(req.user.userId);
-  }
+@Get() // Get teams the current user is a member of
+findUserTeams(@Request() req): Promise<UserTeamListItem[]> { // Use specific return type
+  return this.teamsService.findUserTeams(req.user.userId);
+}
 
-  @Get(':id') // Get specific team details if user is a member
-  findOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    // Service method throws NotFoundException if not found or not a member
-    return this.teamsService.findOne(req.user.userId, id);
-  }
+@Get(':id') // Get specific team details (if user is member)
+// Define a more specific return type if needed, maybe using the FullTeamDetails example type
+findOne(@Request() req, @Param('id', ParseIntPipe) id: number): ReturnType<TeamsService['findOne']> /*Promise<FullTeamDetails | null>*/ {
+  return this.teamsService.findOne(req.user.userId, id);
+}
 
-  @Patch(':id') // Update team name (requires ownership)
-   // @UsePipes(new ValidationPipe({ whitelist: true }))
-  update(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() updateTeamDto: UpdateTeamDto) {
-    // Service method throws ForbiddenException if not owner
-    return this.teamsService.update(req.user.userId, id, updateTeamDto);
-  }
+// --- Dashboard Endpoint ---
+@Get(':id/dashboard')
+getTeamDashboardData(
+  @Request() req,
+  @Param('id', ParseIntPipe) teamId: number
+): Promise<TeamDashboardDto> {
+    return this.teamsService.getTeamDashboardData(req.user.userId, teamId);
+}
 
-  @Delete(':id') // Delete team (requires ownership)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Request() req, @Param('id', ParseIntPipe) id: number) {
-     // Service method throws ForbiddenException if not owner
-    await this.teamsService.remove(req.user.userId, id);
-  }
+// --- Skill History Endpoint ---
+ @Get(':id/members/:memberId/history')
+ getMemberSkillHistory(
+     @Request() req,
+     @Param('id', ParseIntPipe) teamId: number,
+     @Param('memberId', ParseIntPipe) memberId: number,
+ ): Promise<MemberSkillHistoryDto> {
+     // Service method checks if requester is member of team teamId
+     return this.teamsService.getMemberSkillHistory(req.user.userId, teamId, memberId);
+ }
 
-  // --- NEW Dashboard Endpoint ---
-  @Get(':id/dashboard')
-  getTeamDashboardData(
+
+@Patch(':id') // Update team name (requires ownership/leader)
+@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+update(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateTeamDto: UpdateTeamDto
+): Promise<Team> {
+  // Service method handles permission check
+  return this.teamsService.update(req.user.userId, id, updateTeamDto);
+}
+
+@Delete(':id') // Delete team (requires ownership)
+@HttpCode(HttpStatus.NO_CONTENT)
+async remove(@Request() req, @Param('id', ParseIntPipe) id: number): Promise<void> {
+   // Service method handles permission check
+  await this.teamsService.remove(req.user.userId, id);
+}
+
+ // --- Member Management ---
+@Post(':id/members')
+@HttpCode(HttpStatus.CREATED)
+@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+addMember(
+  @Request() req,
+  @Param('id', ParseIntPipe) teamId: number,
+  @Body() addMemberDto: AddMemberDto
+): Promise<TeamMembership> { // Return the created membership info
+    // Service handles leader check and adding member
+    return this.teamsService.addMember(req.user.userId, teamId, addMemberDto);
+}
+
+@Delete(':id/members/:memberId')
+@HttpCode(HttpStatus.NO_CONTENT)
+removeMember(
+  @Request() req,
+  @Param('id', ParseIntPipe) teamId: number,
+  @Param('memberId', ParseIntPipe) memberIdToRemove: number
+): Promise<void> {
+     // Service handles leader check and removing member
+     return this.teamsService.removeMember(req.user.userId, teamId, memberIdToRemove);
+}
+
+@Get(':id/members') // Endpoint to get members list
+getTeamMembers(
     @Request() req,
     @Param('id', ParseIntPipe) teamId: number
-  ): Promise<TeamDashboardDto> {
-      // Service method handles membership check & data aggregation
-      return this.teamsService.getTeamDashboardData(req.user.userId, teamId);
-  }
-
-  // --- NEW Member Skill History Endpoint (Placeholder) ---
-  // @Get(':id/members/:memberId/history')
-  // getMemberSkillHistory(
-  //     @Request() req,
-  //     @Param('id', ParseIntPipe) teamId: number,
-  //     @Param('memberId', ParseIntPipe) memberId: number,
-  //     // @Query() queryParams: GetProgressSummaryDto // Add query params DTO later
-  // ) {
-  //     // return this.teamsService.getMemberSkillHistory(req.user.userId, teamId, memberId /*, queryParams */);
-  // }
-
-    // --- Member Management Endpoints (Placeholder) ---
-    // ...
-   // --- Member Management Endpoints (Placeholder - Add Later) ---
-   // @Get(':id/members')
-   // @Post(':id/members')
-   // @Delete(':id/members/:userId')
+): Promise<TeamMembershipInfo[]> { // Use specific DTO for return type
+     // Service handles check that requester is member
+     return this.teamsService.getTeamMembers(req.user.userId, teamId);
+}
 
 }

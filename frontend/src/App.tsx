@@ -21,6 +21,7 @@ const SkillList = lazy(() => import('./components/SkillList')); // Assuming Skil
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const TeamsPage = lazy(() => import('./pages/TeamsPage')); // Import TeamsPage dynamically
+const TeamDashboardPage = lazy(() => import('./pages/TeamDashboardPage')); // Import TeamDetailsPage dynamically
 
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/skills" element={<ProtectedRoute><SkillList /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} /> {/* <-- ADD TEAM ROUTE */}
+            <Route path="/teams/:teamId" element={<ProtectedRoute><TeamDashboardPage /></ProtectedRoute>} />
             {/* Add route for TeamDetailsPage later */}
 
             {/* Default Route */}
