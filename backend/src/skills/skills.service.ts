@@ -276,7 +276,22 @@ export class SkillsService {
                     },
                     include: { evidence: true } // Include evidence if needed
                 });
-                await tx.skill.update({ where: { id: skillId }, data: { currentScore: createLogDto.score, updatedAt: new Date() } });
+                // --- Conditional Skill Update ---
+                // ONLY update Skill.currentScore if it's a PERSONAL skill
+                if (skill.userId) { // Check if it's a personal skill (userId is set)
+                    await tx.skill.update({
+                        where: { id: skillId },
+                        // Update score ONLY for personal skills
+                        data: { currentScore: createLogDto.score, updatedAt: new Date() },
+                    });
+                } else if (skill.teamId) {
+                    // For TEAM skills, just update the timestamp so it appears in "Recent" lists etc.
+                    // DO NOT update currentScore on the main Skill record.
+                    await tx.skill.update({
+                        where: { id: skillId },
+                        data: { updatedAt: new Date() }, // Only touch updatedAt
+                    });
+                }
                 return createdLog; // Return from transaction block
             });
             return newLog; // Return the result of the transaction

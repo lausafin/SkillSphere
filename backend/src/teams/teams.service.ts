@@ -207,6 +207,7 @@ export class TeamsService {
 
          // Get LATEST score for EACH member on EACH team skill
          const memberScoresList: MemberSkillScoreDto[] = [];
+         console.log(`Dashboard: Processing ${members.length} members for ${teamSkillIds.length} skills.`); // Debug log
          // src/teams/teams.service.ts (Inside getTeamDashboardData loop)
         for (const member of members) {
             const memberId = member.id; // ID of the specific member we're checking
@@ -218,7 +219,7 @@ export class TeamsService {
                         userId: memberId, // <<<--- MUST filter by the specific member ID
                     },
                     orderBy: { timestamp: 'desc' },
-                    select: { score: true }
+                    select: { score: true, timestamp: true } // Select score and timestamp
                 });
                 scoresForMember[skillId] = {
                     currentScore: latestLog?.score ?? null // Use null if no log FOUND FOR THIS MEMBER/SKILL
@@ -227,11 +228,17 @@ export class TeamsService {
             memberScoresList.push({ memberId, scores: scoresForMember });
         }
 
-         const dashboardData: TeamDashboardDto = {
-             teamId: teamData.id, teamName: teamData.name, owner: teamData.owner,
-             members: members, teamSkills: teamSkills, memberScores: memberScoresList
+        const dashboardData: TeamDashboardDto = {
+             // ... teamId, teamName, owner, members, teamSkills ...
+             teamId: teamData.id,
+             teamName: teamData.name,
+             owner: { ...teamData.owner }, // Ensure owner fields match UserProfileDto
+             members: members,
+             teamSkills: teamSkills,
+             memberScores: memberScoresList // Assign the calculated list
          };
-         return dashboardData;
+        // console.log("Dashboard Data Prepared:", JSON.stringify(dashboardData, null, 2)); // Debug log
+        return dashboardData;
     }
 
     // --- Skill History Data (Aggregation Logic) ---
