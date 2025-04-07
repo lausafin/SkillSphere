@@ -185,6 +185,8 @@ const TeamDashboardPage: React.FC = () => {
              });
              return dataPoint;
          });
+
+        console.log(`Line Data: Final processed data for member ${activeMemberHistoryId}:`, JSON.stringify(transformedData)); // Log final array
         return { data: transformedData, keys: includedSkillNames };
     }, [memberHistoryData, teamData]);
 
