@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Team, TeamMembership } from '@prisma/client';
+import { TeamDashboardDto, TeamDashboardMemberDto, TeamDashboardSkillDto, MemberSkillScoreDto } from './dto/team-dashboard.dto'; // Assume DTOs exist
 
 // Assume DTO class exists later
 interface CreateTeamDto { name: string; }
@@ -123,8 +124,106 @@ export class TeamsService {
          }
     }
 
+    // --- NEW: Method for Team Dashboard Data ---
+    async getTeamDashboardData(userId: number, teamId: number): Promise<TeamDashboardDto> {
+        // 1. Verify user is a member of the team & get basic team/member info
+        const membershipCheck = await this.prisma.teamMembership.findFirst({
+            where: { userId: userId, teamId: teamId },
+        });
+        if (!membershipCheck) {
+            throw new ForbiddenException('You are not a member of this team.');
+        }
+
+        const teamData = await this.prisma.team.findUnique({
+            where: { id: teamId },
+            include: {
+                owner: { select: { id: true, name: true, email: true } },
+                members: { // Get all members of the team
+                    include: {
+                        user: { select: { id: true, name: true, email: true } }
+                    }
+                },
+                skills: { // Get skills defined FOR THIS TEAM
+                    where: { teamId: teamId }, // Redundant but safe check
+                    select: { id: true, name: true, maxScore: true } // Select only needed skill fields
+                }
+            }
+        });
+
+        if (!teamData) {
+            throw new NotFoundException(`Team with ID ${teamId} not found.`);
+            // Should not happen if membership check passed, but good practice
+        }
+
+        // 2. Prepare the list of members and skills for the response DTO
+        const members: TeamDashboardMemberDto[] = teamData.members.map(m => ({
+            id: m.user.id,
+            name: m.user.name,
+            email: m.user.email,
+            // role: m.role // Add role if needed later
+        }));
+        const teamSkills: TeamDashboardSkillDto[] = teamData.skills;
+        const teamSkillIds = teamSkills.map(s => s.id);
+
+        // 3. Get the LATEST progress log for EACH member on EACH team skill
+        // This is the trickiest part for efficiency. Using findFirst + orderBy is one way.
+        const memberScoresList: MemberSkillScoreDto[] = [];
+
+        for (const member of members) {
+            const memberId = member.id;
+            const scoresForMember: { [skillId: number]: { currentScore: number | null } } = {};
+
+            // Find latest log for each relevant skill for this specific member
+            for (const skillId of teamSkillIds) {
+                const latestLog = await this.prisma.skillProgressLog.findFirst({
+                    where: {
+                        skillId: skillId,
+                        userId: memberId, // Log belongs to this member
+                    },
+                    orderBy: {
+                        timestamp: 'desc', // Get the most recent one
+                    },
+                    select: {
+                        score: true,
+                        // timestamp: true // If needed for lastUpdated
+                    }
+                });
+                scoresForMember[skillId] = {
+                    currentScore: latestLog ? latestLog.score : null // Store score or null if no log exists
+                };
+            }
+            memberScoresList.push({ memberId, scores: scoresForMember });
+        }
+
+
+        // 4. Construct the final DTO
+        const dashboardData: TeamDashboardDto = {
+            teamId: teamData.id,
+            teamName: teamData.name,
+            owner: teamData.owner,
+            members: members,
+            teamSkills: teamSkills,
+            memberScores: memberScoresList
+        };
+
+        return dashboardData;
+    }
+
+    // --- NEW: Method for Member Skill History (Placeholder) ---
+    // Implement the complex aggregation logic here or in a dedicated service later
+    // async getMemberSkillHistory(userId: number, teamId: number, memberId: number, /* filters? */) : Promise<MemberSkillHistoryDto> {
+    //    // 1. Verify requesting user (userId) is member of teamId
+    //    // 2. Verify target member (memberId) is member of teamId
+    //    // 3. Get team skills for teamId
+    //    // 4. Fetch all relevant SkillProgressLog for memberId on teamSkillIds within time range
+    //    // 5. Process logs into time intervals (monthly?), normalize scores, carry forward, etc.
+    //    // 6. Return data in MemberSkillHistoryDto format
+    //    throw new Error('History endpoint not implemented yet.');
+    // }
+
+   } // End Class
+
      // --- Member Management (Placeholder - Add Later) ---
      // async addMember(leaderId: number, teamId: number, memberEmail: string, role: string = 'MEMBER') { ... }
      // async removeMember(leaderId: number, teamId: number, memberId: number) { ... }
      // async getMembers(userId: number, teamId: number) { ... } // Already partially in findOne
-}

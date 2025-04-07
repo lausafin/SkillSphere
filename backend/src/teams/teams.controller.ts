@@ -3,6 +3,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, 
 import { TeamsService } from './teams.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Correct path
 // Assume DTO classes: CreateTeamDto, UpdateTeamDto
+import { TeamDashboardDto } from './dto/team-dashboard.dto'; // Adjust import as necessary
 
 interface CreateTeamDto { name: string; }
 interface UpdateTeamDto { name?: string; }
@@ -45,8 +46,32 @@ export class TeamsController {
     await this.teamsService.remove(req.user.userId, id);
   }
 
+  // --- NEW Dashboard Endpoint ---
+  @Get(':id/dashboard')
+  getTeamDashboardData(
+    @Request() req,
+    @Param('id', ParseIntPipe) teamId: number
+  ): Promise<TeamDashboardDto> {
+      // Service method handles membership check & data aggregation
+      return this.teamsService.getTeamDashboardData(req.user.userId, teamId);
+  }
+
+  // --- NEW Member Skill History Endpoint (Placeholder) ---
+  // @Get(':id/members/:memberId/history')
+  // getMemberSkillHistory(
+  //     @Request() req,
+  //     @Param('id', ParseIntPipe) teamId: number,
+  //     @Param('memberId', ParseIntPipe) memberId: number,
+  //     // @Query() queryParams: GetProgressSummaryDto // Add query params DTO later
+  // ) {
+  //     // return this.teamsService.getMemberSkillHistory(req.user.userId, teamId, memberId /*, queryParams */);
+  // }
+
+    // --- Member Management Endpoints (Placeholder) ---
+    // ...
    // --- Member Management Endpoints (Placeholder - Add Later) ---
    // @Get(':id/members')
    // @Post(':id/members')
    // @Delete(':id/members/:userId')
+
 }
