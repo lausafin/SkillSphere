@@ -9,6 +9,8 @@ async function bootstrap() {
   // Enable CORS
   app.enableCors({ origin: true, credentials: true }); // Adjust origin for production
 
+  app.setGlobalPrefix('api');
+
   // Apply ValidationPipe globally
   app.useGlobalPipes(new ValidationPipe({
       whitelist: true, // Automatically remove properties without decorators
@@ -19,10 +21,8 @@ async function bootstrap() {
       },
   }));
 
-  app.useGlobalPipes(new ValidationPipe({ /* ... options ... */ }));
-
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`Backend application is running on: ${await app.getUrl()}`); // URL will now include /api if applicable locally
-}
-bootstrap();
+    const port = process.env.PORT || 3000;
+    await app.listen(port);
+    console.log(`Backend application is running on port: ${port}`);
+  }
+  bootstrap();
