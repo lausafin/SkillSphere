@@ -50,11 +50,11 @@ export class SkillsService {
         return tags; // Return statement was missing implementation before
     }
 
-     // Helper to get User Membership for a Team
+    // Option: Explicit select in getUserMembership (usually not needed for scalar enum)
     private async getUserMembership(userId: number, teamId: number): Promise<TeamMembership | null> {
-        // This helper implementation was implicitly assumed before, adding it here
         return this.prisma.teamMembership.findUnique({
-            where: { userId_teamId: { userId, teamId } }
+            where: { userId_teamId: { userId, teamId } },
+            // select: { userId: true, teamId: true, role: true, joinedAt: true } // Add explicit select if needed
         });
     }
 
