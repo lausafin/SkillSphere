@@ -20,6 +20,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SkillList = lazy(() => import('./components/SkillList')); // Assuming SkillList is page-like
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const TeamsPage = lazy(() => import('./pages/TeamsPage')); // Import TeamsPage dynamically
 
 
 export default function App() {
@@ -28,16 +29,24 @@ export default function App() {
     <AuthProvider> <Router> <AppHeader />
       {/* Wrap Routes with Suspense for loading fallback */}
       <Suspense fallback={<Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)"><CircularProgress /></Box>}>
-        <Routes>
-           {/* Render lazily loaded components */}
-           <Route path="/login" element={<LoginPage />} />
-           <Route path="/register" element={<RegisterPage />} />
-           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-           <Route path="/skills" element={<ProtectedRoute><SkillList /></ProtectedRoute>} />
-           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-           <Route path="/" element={<Navigate replace to="/dashboard" />} />
-           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="/skills" element={<ProtectedRoute><SkillList /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} /> {/* <-- ADD TEAM ROUTE */}
+            {/* Add route for TeamDetailsPage later */}
+
+            {/* Default Route */}
+            <Route path="/" element={<Navigate replace to="/dashboard" />} />
+
+            {/* 404 */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
       </Suspense>
     </Router> </AuthProvider>
     </ThemeProvider>

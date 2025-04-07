@@ -37,6 +37,11 @@ const AppHeader: React.FC = () => {
                         <NavLink to="/skills" style={({ isActive }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}>
                             <Button color="inherit"> My Skills </Button>
                         </NavLink>
+                        {/* --- ADDED TEAMS LINK (DESKTOP) --- */}
+                        <NavLink to="/teams" style={({ isActive }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}>
+                            <Button color="inherit"> Teams </Button>
+                        </NavLink>
+                         {/* --- END ADDED LINK --- */}
                     </Box>
                 )}
 
@@ -44,30 +49,22 @@ const AppHeader: React.FC = () => {
                 {isAuthenticated && user ? (
                     <div>
                         <Tooltip title="Account Settings">
-                           {/* ... IconButton ... */}
                            <IconButton size="large" onClick={handleMenu} color="inherit"> <AccountCircle /> <Typography variant="body2" sx={{ ml: 1, display: { xs: 'none', sm: 'inline' } }}> {user.name || user.email} </Typography> </IconButton>
                         </Tooltip>
                         <Menu id="menu-appbar" anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose} /* ... */ >
 
-                            {/* --- Mobile Menu Items (Corrected) --- */}
-                            <NavLink
-                                to="/dashboard"
-                                style={({ isActive }: { isActive: boolean }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}
-                            >
-                                <MenuItem onClick={handleClose} sx={{ display: { xs: 'block', sm: 'none' }, width: '100%' }}>
-                                     {/* Apply width: 100% to MenuItem to make NavLink click area fill it */}
-                                    Dashboard
-                                </MenuItem>
+                            {/* --- Mobile Menu Items --- */}
+                            <NavLink to="/dashboard" style={({ isActive }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}>
+                                <MenuItem onClick={handleClose} sx={{ display: { xs: 'block', sm: 'none' }, width: '100%' }}> Dashboard </MenuItem>
                             </NavLink>
-                            <NavLink
-                                to="/skills"
-                                style={({ isActive }: { isActive: boolean }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}
-                            >
-                                <MenuItem onClick={handleClose} sx={{ display: { xs: 'block', sm: 'none' }, width: '100%' }}>
-                                    My Skills
-                                </MenuItem>
+                            <NavLink to="/skills" style={({ isActive }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}>
+                                <MenuItem onClick={handleClose} sx={{ display: { xs: 'block', sm: 'none' }, width: '100%' }}> My Skills </MenuItem>
                             </NavLink>
-                            {/* --- End Mobile Menu Items Correction --- */}
+                             {/* --- ADDED TEAMS LINK (MOBILE) --- */}
+                            <NavLink to="/teams" style={({ isActive }) => isActive ? activeNavLinkStyle : defaultNavLinkStyle}>
+                                <MenuItem onClick={handleClose} sx={{ display: { xs: 'block', sm: 'none' }, width: '100%' }}> Teams </MenuItem>
+                            </NavLink>
+                            {/* --- END ADDED LINK --- */}
 
                             <Divider sx={{ display: { xs: 'block', sm: 'none' } }} />
                             <MenuItem onClick={handleProfile}>Profile</MenuItem>

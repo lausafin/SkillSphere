@@ -111,4 +111,87 @@ export const fetchTags = async (): Promise<Tag[]> => {
     return response.data;
 };
 
+
+// --- Team API Types ---
+// Match backend Prisma Models / DTOs as closely as possible
+interface TeamOwner { id: number; name?: string | null; email: string; }
+interface TeamMemberUser { id: number; name?: string | null; email: string; }
+interface TeamMembershipInfo { role: string; joinedAt: string; user: TeamMemberUser; } // From TeamMembership include
+export interface Team { // Export if used elsewhere
+    id: number;
+    name: string;
+    ownerId: number;
+    createdAt: string;
+    updatedAt: string;
+    owner: TeamOwner; // Included from backend query
+    // Optional includes based on backend findOne
+    members?: TeamMembershipInfo[];
+    // skills?: Partial<SkillData>[]; // Maybe just count or basic list
+}
+// Type for the list fetched by findUserTeams (might be slightly different than full findOne)
+export interface UserTeamListItem extends Omit<Team, 'members' | 'skills'> { // Example: List doesn't include members/skills
+    // Add user's role in this team if provided by backend endpoint
+    currentUserRole?: string;
+}
+interface CreateTeamDto { name: string; }
+interface UpdateTeamDto { name?: string; }
+
+
+// --- Team API Functions ---
+
+// Fetches teams the current user is a member of
+export const fetchUserTeams = async (): Promise<UserTeamListItem[]> => {
+    const response = await apiClient.get<UserTeamListItem[]>('/teams'); // Assuming GET /api/teams returns list for current user
+    return response.data;
+};
+
+// Fetches details for a specific team (if user is member)
+export const fetchTeamDetails = async (teamId: number): Promise<Team> => {
+    const response = await apiClient.get<Team>(`/teams/${teamId}`);
+    return response.data;
+};
+
+// Creates a new team
+export const createTeam = async (data: CreateTeamDto): Promise<Team> => {
+    const response = await apiClient.post<Team>('/teams', data);
+    return response.data;
+};
+
+// Updates a team (e.g., rename) - Requires ownership
+export const updateTeam = async (teamId: number, data: UpdateTeamDto): Promise<Team> => {
+    const response = await apiClient.patch<Team>(`/teams/${teamId}`, data);
+    return response.data;
+};
+
+// Deletes a team - Requires ownership
+export const deleteTeam = async (teamId: number): Promise<void> => {
+    await apiClient.delete(`/teams/${teamId}`);
+};
+
+
+// --- Member Management API Functions (Placeholders - Add Later) ---
+// export const addTeamMember = async (teamId, /* ... */) => { ... };
+// export const removeTeamMember = async (teamId, userId) => { ... };
+// export const getTeamMembers = async (teamId) => { ... };
+
+// --- Skill API DTOs Need Update ---
+// Ensure Create/Update Skill DTOs have optional userId and teamId
+export interface CreateSkillDto {
+    // ... other fields
+    userId?: number | null; // Belongs to user
+    teamId?: number | null; // Belongs to team
+    notes?: string;
+}
+export interface UpdateSkillDto {
+     // ... other fields
+     // Usually ownership doesn't change on update, but structure needed
+    userId?: number | null;
+    teamId?: number | null;
+}
+
+// --- Update Skill API function signatures if needed ---
+// export const fetchSkills = async (): Promise<SkillData[]> => { ... } // Needs backend update to return mixed skills
+// export const createSkill = async (skillData: CreateSkillDto): Promise<SkillData> => { ... } // Needs to send userId OR teamId
+// export const updateSkill = async (id: number, skillData: UpdateSkillDto): Promise<SkillData> => { ... }
+
 export default apiClient; // Export instance for potential direct use
