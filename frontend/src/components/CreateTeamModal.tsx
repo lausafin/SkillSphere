@@ -50,17 +50,6 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ open, onClose }) => {
         }
     };
 
-    // Reset form when modal closes (ensures clean state next time it opens)
-    // This is handled by handleCancel now, but useEffect could also be used
-    // useEffect(() => {
-    //     if (!open) {
-    //         reset();
-    //         setError(null);
-    //         setIsSubmitting(false); // Ensure submitting state is reset too
-    //     }
-    // }, [open, reset]);
-
-
     return (
         <Dialog open={open} onClose={handleCancel} maxWidth="xs" fullWidth>
             <DialogTitle>Create New Team</DialogTitle>
