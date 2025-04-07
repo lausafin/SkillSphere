@@ -20,7 +20,7 @@ type UserTeamListItemDto = Team & { owner: Pick<User, 'id'|'name'|'email'>, curr
 // Example: type FullTeamDetails = (Team & { members: TeamMembershipInfo[], owner: Pick<User, 'id'|'name'|'email'>, currentUserRole: TeamRole });
 
 
-@Controller('api/teams') // Using global '/api' prefix from main.ts
+@Controller('teams')
 @UseGuards(JwtAuthGuard) // Protect all team routes
 export class TeamsController {
 constructor(private readonly teamsService: TeamsService) {}
