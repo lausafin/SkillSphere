@@ -11,7 +11,7 @@ import {
   import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
   import { Tag } from '@prisma/client';
   
-  @Controller('api/tags') // Base route: /api/tags
+  @Controller('tags') // Base route: /api/tags
   @UseGuards(JwtAuthGuard) // Protect all routes in this controller
   export class TagsController {
     constructor(private readonly tagsService: TagsService) {}

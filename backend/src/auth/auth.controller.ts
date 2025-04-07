@@ -14,7 +14,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard'; // Corrected path assump
 interface RegisterDto { email: string; password: string; name?: string; }
 interface LoginDto { email: string; password: string; }
 
-@Controller('api/auth')
+@Controller('auth')
 export class AuthController {
     constructor(private authService: AuthService) {}
 

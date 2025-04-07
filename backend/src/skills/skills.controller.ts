@@ -11,7 +11,7 @@ interface CreateSkillDto { name: string; description?: string; categoryId?: numb
 interface UpdateSkillDto { name?: string; description?: string; categoryId?: number | null; currentScore?: number; maxScore?: number; ratingScaleType?: string; tags?: string[]; }
 interface CreateProgressLogDto { score: number; notes?: string; timeSpentMinutes?: number; timestamp?: Date; }
 
-@Controller('api/skills')
+@Controller('skills')
 @UseGuards(JwtAuthGuard)
 export class SkillsController {
     constructor(private readonly skillsService: SkillsService) {}

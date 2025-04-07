@@ -7,7 +7,7 @@ interface CreateCategoryDto { name: string; }
 interface UpdateCategoryDto { name?: string; }
 
 
-@Controller('api/categories')
+@Controller('categories')
 @UseGuards(JwtAuthGuard)
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}

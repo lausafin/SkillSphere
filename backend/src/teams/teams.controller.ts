@@ -7,7 +7,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Correct path
 interface CreateTeamDto { name: string; }
 interface UpdateTeamDto { name?: string; }
 
-@Controller('api/teams')
+@Controller('teams')
 @UseGuards(JwtAuthGuard)
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
