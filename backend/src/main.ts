@@ -19,8 +19,10 @@ async function bootstrap() {
       },
   }));
 
+  app.useGlobalPipes(new ValidationPipe({ /* ... options ... */ }));
+
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Backend application is running on port: ${port}`);
+  console.log(`Backend application is running on: ${await app.getUrl()}`); // URL will now include /api if applicable locally
 }
 bootstrap();
