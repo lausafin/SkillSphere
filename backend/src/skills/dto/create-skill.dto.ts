@@ -49,4 +49,10 @@ export class CreateSkillDto {
     @IsString()
     @MaxLength(2000)
     notes?: string;
+
+    @IsOptional() // Allow omitting for personal skills
+    @IsInt()
+    @Min(1)
+    @Type(() => Number)
+    teamId?: number; // <-- ENSURE THIS EXISTS
 }
