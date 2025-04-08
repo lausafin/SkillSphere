@@ -1,11 +1,11 @@
 // src/components/AddEditSkillModal.tsx
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, CircularProgress, Alert } from '@mui/material';
-import SkillForm, { SkillFormData } from './SkillForm'; // Import updated form/type
+import { Dialog, DialogTitle, DialogContent, Alert as MuiAlert, CircularProgress } from '@mui/material';
+import SkillForm, { SkillFormData } from './SkillForm';
 import { createSkill, updateSkill, fetchSkillById } from '../services/api';
-// Import CreateSkillDto if using assertion
-import { CreateSkillDto, UpdateSkillDto } from '../services/api';
-import { useAuth } from '../context/AuthContext'; // Import useAuth to get user ID
+import { CreateSkillDto, UpdateSkillDto } from '../services/api'; // Import DTOs if using assertion
+import { useAuth } from '../context/AuthContext';
+import ManageCategoriesModal from './ManageCategoriesModal'; // <-- Import Category Manager
 
 interface AddEditSkillModalProps { open: boolean; onClose: (refresh?: boolean) => void; skillIdToEdit?: number | null; }
 
@@ -16,6 +16,13 @@ const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, sk
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const mode = skillIdToEdit ? 'edit' : 'add';
+
+    // --- NEW State for Category Modal ---
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    // State to trigger category refresh in SkillForm
+    const [categoryVersion, setCategoryVersion] = useState(0);
+
+    // ... useEffect for fetching initial data ...
 
     // --- useEffect for fetching initial data (for EDIT mode) ---
     useEffect(() => {
@@ -96,25 +103,53 @@ const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, sk
 
     const handleCancel = () => { if (!isSubmitting) onClose(false); };
 
+    // --- NEW Handlers for Category Modal ---
+    const handleOpenCategoryManager = () => {
+        setIsCategoryModalOpen(true);
+    };
+
+    const handleCloseCategoryManager = (categoriesChanged?: boolean) => {
+        setIsCategoryModalOpen(false);
+        if (categoriesChanged) {
+            // Increment version to trigger refetch in SkillForm
+            setCategoryVersion(prev => prev + 1);
+        }
+    };
+
     return (
-         <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
-             <DialogTitle>{mode === 'add' ? 'Add New Skill' : 'Edit Skill'}</DialogTitle>
-             <DialogContent>
-                 {isLoading && <CircularProgress sx={{ display: 'block', margin: 'auto', mb: 2 }}/>}
-                 {error && !isLoading && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                 {!isLoading && (
-                     <SkillForm
-                         key={mode === 'edit' ? `edit-${skillIdToEdit}` : 'add'} // Key helps reset form state
-                         initialData={mode === 'edit' ? initialData : undefined} // Only pass initialData for edit
-                         onSubmit={handleFormSubmit}
-                         onCancel={handleCancel}
-                         isSubmitting={isSubmitting}
-                         mode={mode}
-                     />
-                 )}
-             </DialogContent>
-         </Dialog>
-     );
+        <> {/* Use Fragment to return multiple root elements */}
+            <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
+                <DialogTitle>{mode === 'add' ? 'Add New Skill' : 'Edit Skill'}</DialogTitle>
+                <DialogContent>
+                    {/* --- DISPLAY LOADING AND ERROR --- */}
+                    {isLoading && <CircularProgress sx={{ display: 'block', margin: 'auto', mb: 2 }}/>}
+                    {error && !isLoading && <MuiAlert severity="error" sx={{ mb: 2 }}>{error}</MuiAlert>}
+                     {/* --- END DISPLAY --- */}
+                    {!isLoading && (
+                        <SkillForm
+                            key={mode === 'edit' ? `edit-${skillIdToEdit}-${categoryVersion}` : `add-${categoryVersion}`} // Add categoryVersion to key
+                            initialData={mode === 'edit' ? initialData : undefined}
+                            onSubmit={handleFormSubmit}
+                            onCancel={handleCancel}
+                            isSubmitting={isSubmitting}
+                            mode={mode}
+                            // --- Pass handler to open category manager ---
+                            onManageCategories={handleOpenCategoryManager}
+                            // Pass version to trigger refetch
+                            categoryVersion={categoryVersion}
+                        />
+                    )}
+                </DialogContent>
+                {/* DialogActions can stay here if needed, but form has its own buttons */}
+            </Dialog>
+
+            {/* Render the Category Management Modal */}
+            <ManageCategoriesModal
+                 open={isCategoryModalOpen}
+                 onClose={handleCloseCategoryManager}
+            />
+        </>
+    );
 };
 
 export default AddEditSkillModal;

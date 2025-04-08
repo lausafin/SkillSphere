@@ -42,6 +42,8 @@ interface SkillFormProps {
     onCancel: () => void;
     isSubmitting: boolean;
     mode: 'add' | 'edit';
+    onManageCategories: () => void; // <-- ADD THIS LINE
+    categoryVersion: number;
 }
 
 const SkillForm: React.FC<SkillFormProps> = ({
