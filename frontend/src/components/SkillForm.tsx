@@ -54,7 +54,7 @@ const SkillForm: React.FC<SkillFormProps> = ({
     const [loadingFormData, setLoadingFormData] = useState(false);
     const [dataFetchError, setDataFetchError] = useState<string | null>(null);
 
-    const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<SkillFormData>({
+    const { control, handleSubmit, reset, watch, formState: { errors }, setValue } = useForm<SkillFormData>({
         // Use Zod resolver with refinement for team selection
          resolver: zodResolver(
             baseSkillSchema.refine(data => data.currentScore <= data.maxScore, {
@@ -116,6 +116,13 @@ const SkillForm: React.FC<SkillFormProps> = ({
         }
     }, [initialData, mode, reset]); // Dependencies for resetting
 
+    useEffect(() => {
+        if (mode === 'add' && ownershipValue === 'team' && userOwnedTeams.length === 1) {
+             // Only one team available, auto-select it
+             setValue('teamId', userOwnedTeams[0].id, { shouldValidate: true }); // Set value and trigger validation if needed
+        }
+
+    }, [mode, ownershipValue, userOwnedTeams, setValue]);
 
     // --- Dynamic Score Validation Schema (used in Controller rules) ---
      const scoreValidationSchema = z.coerce
