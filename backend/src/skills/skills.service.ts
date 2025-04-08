@@ -267,69 +267,45 @@ export class SkillsService {
      // --- Progress Log Methods ---
 
      async addProgressLog(userId: number, skillId: number, createLogDto: CreateProgressLogDto): Promise<SkillProgressLog> {
-        // 1. Fetch the skill directly first - we need its maxScore and ownership info
-        const skill = await this.prisma.skill.findUnique({
-            where: { id: skillId },
-            select: { userId: true, teamId: true, maxScore: true } // Select only needed fields
-        });
-        if (!skill) {
-            throw new NotFoundException(`Skill with ID ${skillId} not found.`);
-        }
+         // Check access first
+         const skill = await this.findOne(userId, skillId); // Use findOne for combined check
+         if (!skill) { throw new NotFoundException(`Skill with ID ${skillId} not found or access denied.`); }
+         // Add specific LOGGING permission if different from VIEWING permission checked by findOne...
+         // (Assuming any member can log for now, which findOne allows)
 
-        // 2. Perform specific permission check for LOGGING progress
-        let canLog = false;
-        if (skill.userId === userId) { // Is it their personal skill?
-            canLog = true;
-        } else if (skill.teamId) { // Is it a team skill?
-             // Check if the requesting user is a member of that team
-             const membership = await this.getUserMembership(userId, skill.teamId);
-             if (membership) { // If membership exists (ANY role: MEMBER or LEADER)
-                 canLog = true; // Allow logging
-             }
-        }
+         if (createLogDto.score < 0 || createLogDto.score > skill.maxScore) {
+            throw new ForbiddenException(`Score must be between 0 and ${skill.maxScore}.`);
+         }
 
-        // If permission check failed, throw error
-        if (!canLog) {
-             throw new ForbiddenException(`You do not have permission to log progress for this skill.`);
-        }
-
-        // 3. Validate Score against the fetched skill's maxScore
-        if (createLogDto.score < 0 || createLogDto.score > skill.maxScore) {
-            throw new BadRequestException(`Score must be between 0 and ${skill.maxScore}.`); // Use BadRequest for invalid input
-        }
-
-        // 4. Create Log & Update Skill (Transaction)
         try {
             const newLog = await this.prisma.$transaction(async (tx) => {
                 const createdLog = await tx.skillProgressLog.create({
                     data: {
-                        score: createLogDto.score,
-                        notes: createLogDto.notes,
-                        timeSpentMinutes: createLogDto.timeSpentMinutes,
-                        timestamp: createLogDto.timestamp ?? new Date(),
-                        skill: { connect: { id: skillId } }, // Connect to the skill
-                        user: { connect: { id: userId } } // Connect to user performing the log
+                        score: createLogDto.score, notes: createLogDto.notes, timeSpentMinutes: createLogDto.timeSpentMinutes, timestamp: createLogDto.timestamp ?? new Date(),
+                        skill: { connect: { id: skillId } },
+                        user: { connect: { id: userId } }
                     },
-                    include: { evidence: true }
+                    include: { evidence: true } // Include evidence if needed
                 });
-
                 // --- Conditional Skill Update ---
-                if (skill.userId) { // Is personal skill (check original fetched skill info)
+                // ONLY update Skill.currentScore if it's a PERSONAL skill
+                if (skill.userId) { // Check if it's a personal skill (userId is set)
                     await tx.skill.update({
                         where: { id: skillId },
+                        // Update score ONLY for personal skills
                         data: { currentScore: createLogDto.score, updatedAt: new Date() },
                     });
-                } else { // Is team skill (teamId must be set if userId is null)
-                     await tx.skill.update({
-                         where: { id: skillId },
-                         data: { updatedAt: new Date() }, // Only touch updatedAt for team skills
-                     });
+                } else if (skill.teamId) {
+                    // For TEAM skills, just update the timestamp so it appears in "Recent" lists etc.
+                    // DO NOT update currentScore on the main Skill record.
+                    await tx.skill.update({
+                        where: { id: skillId },
+                        data: { updatedAt: new Date() }, // Only touch updatedAt
+                    });
                 }
-                // --- End Conditional Update ---
-
-                return createdLog;
+                return createdLog; // Return from transaction block
             });
-            return newLog;
+            return newLog; // Return the result of the transaction
         } catch (error) {
             console.error("Error adding progress log:", error);
             throw new InternalServerErrorException("Could not add progress log.");
