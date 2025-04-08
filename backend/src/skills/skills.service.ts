@@ -203,28 +203,37 @@ export class SkillsService {
              const tagsToSet = await this.connectOrCreateTags(userId, updateSkillDto.tags);
              tagUpdateOperations = { deleteMany: {}, create: tagsToSet.map(tag => ({ assignedBy: `user:${userId}`, tag: { connect: { id: tag.id } } })) };
          }
+        // --- Data to Update ---
+        // Construct the data object carefully, excluding direct currentScore update
+        const dataToUpdate: Prisma.SkillUpdateInput = {
+            name: updateSkillDto.name,
+            description: updateSkillDto.description,
+            // Allow setting category to null or a new ID
+            category: updateSkillDto.categoryId !== undefined ? { connect: { id: updateSkillDto.categoryId } } : undefined,
+            // Allow updating maxScore
+            maxScore: updateSkillDto.maxScore,
+            ratingScaleType: updateSkillDto.ratingScaleType,
+            // Apply tag operations
+            tags: tagUpdateOperations,
+            // DO NOT include updateSkillDto.currentScore here
+        };
+        // Clean undefined properties to avoid Prisma issues
+        Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
+
 
         try {
             const updatedSkill = await this.prisma.skill.update({
                 where: { id },
-                data: {
-                    name: updateSkillDto.name,
-                    description: updateSkillDto.description,
-                    // Handle setting categoryId to null or a value
-                    categoryId: updateSkillDto.categoryId !== undefined ? updateSkillDto.categoryId : undefined,
-                    currentScore: updateSkillDto.currentScore,
-                    maxScore: updateSkillDto.maxScore,
-                    ratingScaleType: updateSkillDto.ratingScaleType,
-                    tags: tagUpdateOperations,
-                },
-                include: { // Re-include relations to match SkillWithRelations
+                data: dataToUpdate, // Use the prepared data object
+                include: { // Re-include relations needed for the return type
                     category: true,
                     tags: { include: { tag: true } },
                     user: { select: { id: true, name: true } },
                     team: { include: { owner: { select: { id: true, name: true }}}}
+                    // Add logs/goals include if needed by SkillWithRelations
                 }
             });
-            return updatedSkill as SkillWithRelations; // Still might need cast depending on TS strictness
+            return updatedSkill as SkillWithRelations;
 
         } catch (error) {
             console.error("Error updating skill:", error);
