@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 // Import Prisma types AND generated types explicitly
-import { Prisma, Skill, SkillProgressLog, Tag, Team, TeamMembership, User, Goal, SkillEvidence, SkillTag, Category } from '@prisma/client'; // Added all potentially needed types
+import { Prisma, Skill, SkillProgressLog, Tag, Team, TeamMembership, User, Goal, SkillEvidence, SkillTag, Category, TeamRole } from '@prisma/client'; // Added all potentially needed types
 
 // --- Import the DTO Classes ---
 // Ensure these files exist and export the classes correctly
@@ -70,13 +70,15 @@ export class SkillsService {
         let scopeCheck: Prisma.SkillWhereInput = {}; // For duplicate name check
 
         if (teamId) {
-            // Team Skill Creation Permission Check
+            // Team Skill Creation
+            console.log(`DEBUG: Creating team skill. UserID=${userId}, TeamID=${teamId}`); // Log input IDs
             const membership = await this.getUserMembership(userId, teamId);
-            if (!membership || membership.role !== 'LEADER') {
+            console.log(`DEBUG: Found membership for leader check:`, membership); // Log result of check
+            // Check role using the imported Enum
+            if (!membership || membership.role !== TeamRole.LEADER) { // Breakpoint here
+                console.error(`DEBUG: Permission denied. Membership found: ${!!membership}, Role: ${membership?.role}`); // Log why it failed
                 throw new ForbiddenException(`You must be a LEADER to create skills for this team (ID: ${teamId}).`);
             }
-            scopeCheck = { teamId: teamId };
-        } else {
             // Personal Skill Creation Scope
             scopeCheck = { userId: userId };
         }
