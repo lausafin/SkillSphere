@@ -1,3 +1,6 @@
+-- CreateEnum
+CREATE TYPE "TeamRole" AS ENUM ('LEADER', 'MEMBER');
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" SERIAL NOT NULL,
@@ -21,9 +24,29 @@ CREATE TABLE "AuthProvider" (
 );
 
 -- CreateTable
+CREATE TABLE "Team" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "ownerId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Team_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TeamMembership" (
+    "userId" INTEGER NOT NULL,
+    "teamId" INTEGER NOT NULL,
+    "role" "TeamRole" NOT NULL DEFAULT 'MEMBER',
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TeamMembership_pkey" PRIMARY KEY ("userId","teamId")
+);
+
+-- CreateTable
 CREATE TABLE "Skill" (
     "id" SERIAL NOT NULL,
-    "userId" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "categoryId" INTEGER,
@@ -32,6 +55,8 @@ CREATE TABLE "Skill" (
     "ratingScaleType" TEXT NOT NULL DEFAULT 'numeric',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" INTEGER,
+    "teamId" INTEGER,
 
     CONSTRAINT "Skill_pkey" PRIMARY KEY ("id")
 );
@@ -49,6 +74,7 @@ CREATE TABLE "Category" (
 CREATE TABLE "SkillProgressLog" (
     "id" SERIAL NOT NULL,
     "skillId" INTEGER NOT NULL,
+    "userId" INTEGER NOT NULL,
     "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "score" INTEGER NOT NULL,
     "notes" TEXT,
@@ -108,7 +134,13 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 CREATE UNIQUE INDEX "AuthProvider_providerName_providerId_key" ON "AuthProvider"("providerName", "providerId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Team_ownerId_name_key" ON "Team"("ownerId", "name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Skill_userId_name_key" ON "Skill"("userId", "name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Skill_teamId_name_key" ON "Skill"("teamId", "name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Category_userId_name_key" ON "Category"("userId", "name");
@@ -120,7 +152,19 @@ CREATE UNIQUE INDEX "Tag_userId_name_key" ON "Tag"("userId", "name");
 ALTER TABLE "AuthProvider" ADD CONSTRAINT "AuthProvider_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Team" ADD CONSTRAINT "Team_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TeamMembership" ADD CONSTRAINT "TeamMembership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TeamMembership" ADD CONSTRAINT "TeamMembership_teamId_fkey" FOREIGN KEY ("teamId") REFERENCES "Team"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Skill" ADD CONSTRAINT "Skill_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Skill" ADD CONSTRAINT "Skill_teamId_fkey" FOREIGN KEY ("teamId") REFERENCES "Team"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Skill" ADD CONSTRAINT "Skill_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -130,6 +174,9 @@ ALTER TABLE "Category" ADD CONSTRAINT "Category_userId_fkey" FOREIGN KEY ("userI
 
 -- AddForeignKey
 ALTER TABLE "SkillProgressLog" ADD CONSTRAINT "SkillProgressLog_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "Skill"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SkillProgressLog" ADD CONSTRAINT "SkillProgressLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SkillEvidence" ADD CONSTRAINT "SkillEvidence_logId_fkey" FOREIGN KEY ("logId") REFERENCES "SkillProgressLog"("id") ON DELETE CASCADE ON UPDATE CASCADE;
