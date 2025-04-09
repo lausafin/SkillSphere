@@ -6,6 +6,8 @@ import { createSkill, updateSkill, fetchSkillById } from '../services/api';
 import { CreateSkillDto, UpdateSkillDto } from '../services/api'; // Import DTOs if using assertion
 import { useAuth } from '../context/AuthContext';
 import ManageCategoriesModal from './ManageCategoriesModal'; // <-- Import Category Manager
+import AddCategoryModal from './AddCategoryModal'; // <-- Import NEW Add modal
+import { Category } from '../services/api'; // <-- Import Category type
 
 interface AddEditSkillModalProps { open: boolean; onClose: (refresh?: boolean) => void; skillIdToEdit?: number | null; }
 
@@ -21,6 +23,9 @@ const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, sk
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     // State to trigger category refresh in SkillForm
     const [categoryVersion, setCategoryVersion] = useState(0);
+
+    // --- NEW State for Add Category Modal ---
+    const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
 
     // ... useEffect for fetching initial data ...
 
@@ -103,51 +108,55 @@ const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, sk
 
     const handleCancel = () => { if (!isSubmitting) onClose(false); };
 
-    // --- NEW Handlers for Category Modal ---
-    const handleOpenCategoryManager = () => {
-        setIsCategoryModalOpen(true);
-    };
-
+    // --- Manage Category Modal Handlers ---
+    const handleOpenCategoryManager = () => setIsCategoryModalOpen(true);
     const handleCloseCategoryManager = (categoriesChanged?: boolean) => {
         setIsCategoryModalOpen(false);
-        if (categoriesChanged) {
-            // Increment version to trigger refetch in SkillForm
+        if (categoriesChanged) setCategoryVersion(prev => prev + 1);
+    };
+
+    // --- NEW Add Category Modal Handlers ---
+    const handleOpenAddCategory = () => {
+        setIsAddCategoryModalOpen(true);
+    };
+    const handleCloseAddCategory = (newCategory?: Category) => { // Expect new category back
+        setIsAddCategoryModalOpen(false);
+        if (newCategory) {
+            // A new category was added, increment version to refresh SkillForm dropdown
             setCategoryVersion(prev => prev + 1);
+            // TODO: Optionally auto-select the newly added category in the SkillForm?
+            // This would require passing a callback down to SkillForm to set its value.
+            // Example: setSelectedCategoryId(newCategory.id); // Need state for this
         }
     };
 
     return (
-        <> {/* Use Fragment to return multiple root elements */}
+        <>
             <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
                 <DialogTitle>{mode === 'add' ? 'Add New Skill' : 'Edit Skill'}</DialogTitle>
                 <DialogContent>
-                    {/* --- DISPLAY LOADING AND ERROR --- */}
-                    {isLoading && <CircularProgress sx={{ display: 'block', margin: 'auto', mb: 2 }}/>}
-                    {error && !isLoading && <MuiAlert severity="error" sx={{ mb: 2 }}>{error}</MuiAlert>}
-                     {/* --- END DISPLAY --- */}
+                     {isLoading && <CircularProgress sx={{ display: 'block', margin: 'auto', mb: 2 }}/>}
+                     {error && !isLoading && <MuiAlert severity="error" sx={{ mb: 2 }}>{error}</MuiAlert>}
+
                     {!isLoading && (
                         <SkillForm
-                            key={mode === 'edit' ? `edit-${skillIdToEdit}-${categoryVersion}` : `add-${categoryVersion}`} // Add categoryVersion to key
-                            initialData={mode === 'edit' ? initialData : undefined}
+                            key={mode === 'edit' ? `edit-${skillIdToEdit}-${categoryVersion}` : `add-${categoryVersion}`}
+                                                        initialData={mode === 'edit' ? initialData : undefined}
                             onSubmit={handleFormSubmit}
                             onCancel={handleCancel}
                             isSubmitting={isSubmitting}
                             mode={mode}
-                            // --- Pass handler to open category manager ---
-                            onManageCategories={handleOpenCategoryManager}
-                            // Pass version to trigger refetch
+                            onManageCategories={handleOpenCategoryManager} // Pass manage handler
+                            onAddCategory={handleOpenAddCategory} // <-- Pass NEW add handler
                             categoryVersion={categoryVersion}
                         />
                     )}
                 </DialogContent>
-                {/* DialogActions can stay here if needed, but form has its own buttons */}
             </Dialog>
 
-            {/* Render the Category Management Modal */}
-            <ManageCategoriesModal
-                 open={isCategoryModalOpen}
-                 onClose={handleCloseCategoryManager}
-            />
+            {/* Render BOTH Modals */}
+            <ManageCategoriesModal open={isCategoryModalOpen} onClose={handleCloseCategoryManager} />
+            <AddCategoryModal open={isAddCategoryModalOpen} onClose={handleCloseAddCategory} />
         </>
     );
 };
