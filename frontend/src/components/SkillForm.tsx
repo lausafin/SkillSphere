@@ -5,10 +5,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
     TextField, Button, Box, Slider, Typography, FormControl, InputLabel, Select,
-    MenuItem, Autocomplete, Chip, CircularProgress, Alert, RadioGroup, FormControlLabel, Radio
+    MenuItem, Autocomplete, Chip, CircularProgress, Alert, RadioGroup, FormControlLabel, Radio, IconButton, Tooltip
 } from '@mui/material';
+import SettingsIcon from '@mui/icons-material/Settings'; // Icon for manage button
 import { fetchCategories, fetchTags, fetchUserTeams, UserTeamListItem } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+
 
 // Define Category and Tag types locally or import
 interface Category { id: number; name: string; }
@@ -47,7 +49,8 @@ interface SkillFormProps {
 }
 
 const SkillForm: React.FC<SkillFormProps> = ({
-    initialData, onSubmit, onCancel, isSubmitting, mode
+    initialData, onSubmit, onCancel, isSubmitting, mode,
+    onManageCategories, categoryVersion // <-- Destructure new props
 }) => {
     const { user } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
@@ -55,7 +58,6 @@ const SkillForm: React.FC<SkillFormProps> = ({
     const [userOwnedTeams, setUserOwnedTeams] = useState<UserTeamListItem[]>([]);
     const [loadingFormData, setLoadingFormData] = useState(false);
     const [dataFetchError, setDataFetchError] = useState<string | null>(null);
-
     const { control, handleSubmit, reset, watch, formState: { errors }, setValue } = useForm<SkillFormData>({
         // Use Zod resolver with refinement for team selection
          resolver: zodResolver(
@@ -84,17 +86,20 @@ const SkillForm: React.FC<SkillFormProps> = ({
         const fetchData = async () => {
             setLoadingFormData(true); setDataFetchError(null);
             try {
+                // Fetch teams only if needed
                 const teamPromise = (mode === 'add' && user) ? fetchUserTeams() : Promise.resolve([]);
-                const [catData, tagData, teamData] = await Promise.all([fetchCategories(), fetchTags(), teamPromise]);
+                // Refetch categories/tags whenever categoryVersion changes
+                const [catData, tagData, teamData] = await Promise.all([
+                    fetchCategories(), fetchTags(), teamPromise
+                ]);
                 setCategories(catData);
                 setExistingTags(tagData);
-                // Simplified: User can create for teams they own. Refine later with roles.
                 setUserOwnedTeams(teamData.filter(team => team.ownerId === user?.id));
             } catch (error: any) { setDataFetchError("Could not load categories/tags/teams."); console.error(error); }
             finally { setLoadingFormData(false); }
         };
         fetchData();
-    }, [mode, user]); // Dependencies for fetching
+    }, [mode, user, categoryVersion]); // <-- ADD categoryVersion HERE
 
     // --- Form Reset Effect ---
     useEffect(() => {
@@ -159,6 +164,29 @@ const SkillForm: React.FC<SkillFormProps> = ({
                      {errors.teamId && <Typography color="error" variant="caption" sx={{ml: 2}}>{errors.teamId.message}</Typography>}
                  </FormControl>
              )}
+
+            {/* --- Category Select with Manage Button --- */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}> {/* Wrap FormControl and Button */}
+                <FormControl fullWidth margin="normal" disabled={isSubmitting || loadingFormData} sx={{ flexGrow: 1 }}>
+                    <InputLabel id="category-select-label">Category (Optional)</InputLabel>
+                    <Controller name="categoryId" control={control} defaultValue={null}
+                        render={({ field }) => (
+                            <Select {...field} labelId="category-select-label" label="Category (Optional)" value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))} >
+                                 <MenuItem value=""><em>None</em></MenuItem>
+                                 {categories.map((cat) => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
+                                 {categories.length === 0 && <MenuItem disabled>No categories found</MenuItem>}
+                            </Select>
+                         )} />
+                 </FormControl>
+                 <Tooltip title="Manage Categories">
+                    {/* Add IconButton outside FormControl but aligned */}
+                    <IconButton onClick={onManageCategories} aria-label="manage categories" sx={{ mb: 1 }} /* Adjust margin-bottom to align with textfield */ >
+                        <SettingsIcon />
+                    </IconButton>
+                 </Tooltip>
+            </Box>
+             {/* Display categoryId error below the Box */}
+             {errors.categoryId && <Typography color="error" variant="caption" sx={{ pl: 2 }}>{errors.categoryId.message}</Typography>}
 
             {/* --- Standard Skill Fields --- */}
             {/* Name */}
