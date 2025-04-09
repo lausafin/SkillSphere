@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 // Removed Alert, Divider from import - Keep others
 import { Box, Typography, Paper, TextField, Button, CircularProgress } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
-import ManageCategoriesModal from '../components/ManageCategoriesModal'; // Import the modal
 
 const ProfilePage: React.FC = () => {
     const { user, isLoading: authLoading } = useAuth(); // Get user and loading state
@@ -15,8 +14,6 @@ const ProfilePage: React.FC = () => {
     // const [error, setError] = useState<string | null>(null);
     // const [success, setSuccess] = useState<string | null>(null);
 
-
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
     // Initialize name state when user data is available
     useEffect(() => {
@@ -46,18 +43,6 @@ const ProfilePage: React.FC = () => {
         finally { setIsSubmitting(false); }
     };
 
-    const handleManageCategories = () => {
-        setIsCategoryModalOpen(true);
-    };
-
-    const handleCloseCategoryModal = (categoriesChanged?: boolean) => {
-        setIsCategoryModalOpen(false);
-        if (categoriesChanged) {
-            console.log("Categories were updated.");
-            // You might add a Snackbar notification here later
-        }
-    };
-
     // Display loading spinner while auth state is loading or user isn't available yet
     if (authLoading || !user) {
         return (
@@ -81,24 +66,7 @@ const ProfilePage: React.FC = () => {
                     </Button>
                 </Paper>
 
-                <Typography variant="h5" gutterBottom>Settings</Typography>
-                <Paper elevation={2} sx={{ p: 3 }}> {/* Settings Section */}
-                     <Typography variant="h6" gutterBottom>Categories</Typography>
-                     <Typography variant="body2" color="textSecondary" sx={{mb: 2}}>
-                         Organize your skills by adding custom categories.
-                     </Typography>
-                     <Button variant="outlined" onClick={handleManageCategories}>
-                        Manage Categories
-                    </Button>
-                     {/* Removed unused Divider import */}
-                 </Paper>
             </Box>
-
-            {/* Category Management Modal */}
-            <ManageCategoriesModal
-                open={isCategoryModalOpen}
-                onClose={handleCloseCategoryModal}
-            />
         </>
     );
 };
