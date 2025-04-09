@@ -7,7 +7,6 @@ import {
     TextField, Button, Box, Slider, Typography, FormControl, InputLabel, Select,
     MenuItem, Autocomplete, Chip, CircularProgress, Alert, RadioGroup, FormControlLabel, Radio, IconButton, Tooltip
 } from '@mui/material';
-import SettingsIcon from '@mui/icons-material/Settings'; // Icon for manage button
 import { fetchCategories, fetchTags, fetchUserTeams, UserTeamListItem } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'; // <-- Import Add Icon
@@ -45,14 +44,13 @@ interface SkillFormProps {
     onCancel: () => void;
     isSubmitting: boolean;
     mode: 'add' | 'edit';
-    onManageCategories: () => void; // <-- ADD THIS LINE
     categoryVersion: number;
     onAddCategory: () => void; // <-- Prop is defined here
 }
 
 const SkillForm: React.FC<SkillFormProps> = ({
     initialData, onSubmit, onCancel, isSubmitting, mode,
-    onManageCategories, categoryVersion, onAddCategory // <-- Destructure new props
+    categoryVersion, onAddCategory // <-- Destructure new props
     
 }) => {
     const { user } = useAuth();
@@ -186,12 +184,6 @@ const SkillForm: React.FC<SkillFormProps> = ({
                      <IconButton onClick={onAddCategory} aria-label="add category" sx={{ mb: 1 }}>
                          <AddCircleOutlineIcon />
                      </IconButton>
-                 </Tooltip>
-                 {/* MANAGE Button */}
-                 <Tooltip title="Manage Categories">
-                    <IconButton onClick={onManageCategories} aria-label="manage categories" sx={{ mb: 1 }}>
-                        <SettingsIcon />
-                    </IconButton>
                  </Tooltip>
             </Box>
              {/* Display categoryId error below the Box */}
