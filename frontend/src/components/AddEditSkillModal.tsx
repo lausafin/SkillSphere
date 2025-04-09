@@ -108,8 +108,6 @@ const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, sk
 
     const handleCancel = () => { if (!isSubmitting) onClose(false); };
 
-    // --- Manage Category Modal Handlers ---
-    const handleOpenCategoryManager = () => setIsCategoryModalOpen(true);
     const handleCloseCategoryManager = (categoriesChanged?: boolean) => {
         setIsCategoryModalOpen(false);
         if (categoriesChanged) setCategoryVersion(prev => prev + 1);
@@ -146,7 +144,6 @@ const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, sk
                             onCancel={handleCancel}
                             isSubmitting={isSubmitting}
                             mode={mode}
-                            onManageCategories={handleOpenCategoryManager} // Pass manage handler
                             onAddCategory={handleOpenAddCategory} // <-- Pass NEW add handler
                             categoryVersion={categoryVersion}
                         />
