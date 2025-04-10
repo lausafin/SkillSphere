@@ -1,56 +1,91 @@
 // src/App.tsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy } from 'react'; // Import Suspense and lazy
-import { AuthProvider } from './context/AuthContext';
-import { ThemeProvider, CssBaseline, createTheme, Box, CircularProgress } from '@mui/material';
-import AppHeader from './components/AppHeader'; // Import AppHeader component
-import ProtectedRoute from './components/ProtectedRoute'; // Import ProtectedRoute component
+import { Suspense, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'; // Import useLocation if using ProtectedRoute logic here
+import { AuthProvider, useAuth } from './context/AuthContext'; // Import useAuth
+import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
+import theme from './theme'; // Assuming your theme is defined here
 
-// Basic theme example
-const theme = createTheme({
-  palette: {
-    mode: 'light', // Or 'dark'
-  },
-});
+// Import Header
+import AppHeader from './components/AppHeader';
 
 // Dynamically import pages
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const SkillList = lazy(() => import('./components/SkillList')); // Assuming SkillList is page-like
+const SkillList = lazy(() => import('./components/SkillList'));
+const TeamsPage = lazy(() => import('./pages/TeamsPage'));
+const TeamDashboardPage = lazy(() => import('./pages/TeamDashboardPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
-const TeamsPage = lazy(() => import('./pages/TeamsPage')); // Import TeamsPage dynamically
-const TeamDashboardPage = lazy(() => import('./pages/TeamDashboardPage')); // Import TeamDetailsPage dynamically
+const LandingPage = lazy(() => import('./pages/LandingPage')); // <-- Import Landing Page
+
+// Updated Protected Route (can be kept separate or logic merged here)
+const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+    const { isAuthenticated, isLoading } = useAuth();
+    const location = useLocation();
+
+    if (isLoading) {
+        return <Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)"><CircularProgress /></Box>;
+    }
+    if (!isAuthenticated) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+    return children;
+};
+
+// Component to handle root redirection
+const RootRedirect = () => {
+    const { isAuthenticated, isLoading } = useAuth();
+    if (isLoading) { // Show loading while checking auth for root path
+        return <Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)"><CircularProgress /></Box>;
+    }
+    // If logged in, go to dashboard, otherwise go to landing page
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/welcome" replace />;
+};
+
+// Component to prevent authenticated users from accessing public-only pages
+const PublicRoute = ({ children }: { children: JSX.Element }) => {
+     const { isAuthenticated, isLoading } = useAuth();
+     if (isLoading) {
+        return <Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)"><CircularProgress /></Box>;
+     }
+     // If authenticated, redirect away from public-only page (e.g., login/register/landing)
+     return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+};
 
 
-export default function App() {
+function App() {
   return (
-    <ThemeProvider theme={theme}> <CssBaseline />
-    <AuthProvider> <Router> <AppHeader />
-      {/* Wrap Routes with Suspense for loading fallback */}
-      <Suspense fallback={<Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)"><CircularProgress /></Box>}>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      {/* AuthProvider needs to wrap Router */}
+      <AuthProvider>
+        <Router>
+          <AppHeader />
+           <Suspense fallback={<Box display="flex" justifyContent="center" alignItems="center" height="calc(100vh - 64px)"><CircularProgress /></Box>}>
+            <Routes>
+                {/* Public Routes - Redirect if logged in */}
+                <Route path="/welcome" element={<PublicRoute><LandingPage /></PublicRoute>} />
+                <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
-            {/* Protected Routes */}
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/skills" element={<ProtectedRoute><SkillList /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} /> {/* <-- ADD TEAM ROUTE */}
-            <Route path="/teams/:teamId" element={<ProtectedRoute><TeamDashboardPage /></ProtectedRoute>} />
-            {/* Add route for TeamDetailsPage later */}
+                {/* Protected Routes */}
+                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+                <Route path="/skills" element={<ProtectedRoute><SkillList /></ProtectedRoute>} />
+                <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
+                <Route path="/teams/:teamId" element={<ProtectedRoute><TeamDashboardPage /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
-            {/* Default Route */}
-            <Route path="/" element={<Navigate replace to="/dashboard" />} />
+                {/* Root Route Handler */}
+                <Route path="/" element={<RootRedirect />} />
 
-            {/* 404 */}
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-      </Suspense>
-    </Router> </AuthProvider>
+                {/* 404 */}
+                <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
+export default App;
