@@ -18,7 +18,7 @@ import MultiSkillProgressChart from '../components/MultiSkillProgressChart'; // 
 // Import type needed for processing history data, ensure it's exported from chart component
 import type { MultiProgressChartDataPoint } from '../components/MultiSkillProgressChart';
 // Import type needed from API for history data structure
-import { SkillProgressHistoryPointScoresDto } from '../services/api'; // Import necessary sub-types
+import { MemberSkillHistoryPointDto } from '../services/api'; // Import necessary sub-types
 
 
 // Custom Alert for potential future use
@@ -100,7 +100,7 @@ const DashboardPage: React.FC = () => {
         const skillIdNameMap = skillProgressData.skillNames; // { skillId: skillName }
 
         // Map directly over the correct history array type
-        const transformedData = skillProgressData.history.map((point: SkillProgressHistoryPointScoresDto) => { // point IS SkillProgressHistoryPointDto
+        const transformedData = skillProgressData.history.map((point: MemberSkillHistoryPointDto) => { // point IS SkillProgressHistoryPointDto
 
              // Create the base data point for the chart using correct properties
              const dataPoint: MultiProgressChartDataPoint = {
