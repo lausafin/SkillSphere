@@ -72,14 +72,14 @@ export class SkillsController {
         return this.skillsService.getProgressLogs(req.user.userId, skillId);
     }
 
-    // --- NEW Endpoint for Progress Summary ---
     @Get('progress-summary')
-    getPersonalSkillProgressSummary(
+    async getPersonalSkillProgressSummary( // Make async to match original Promise return type
         @Request() req
-    ): Promise<SkillProgressSummaryDto> {
-        // Service fetches data for the logged-in user
-        return this.skillsService.getPersonalSkillProgressSummary(req.user.userId);
+    ): Promise<any> { // Return 'any' temporarily
+        console.log('!!! Controller method hit for progress-summary !!! User ID:', req.user?.userId);
+        // Temporarily bypass service call
+        // return this.skillsService.getPersonalSkillProgressSummary(req.user.userId);
+        return { message: "Controller reached successfully", userId: req.user?.userId }; // Return simple object
     }
-    // --- END New Endpoint ---
 
 }
