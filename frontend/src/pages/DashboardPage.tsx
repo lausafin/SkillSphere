@@ -90,32 +90,34 @@ const DashboardPage: React.FC = () => {
         return pieData;
     }, [skills]);
 
-    // --- Prepare data for Multi-Skill Line Chart ---
-    const multiSkillChartProcessedData = useMemo(() => {
-        // Use the data fetched from the dedicated summary endpoint
+     // --- Prepare data for Multi-Skill Line Chart ---
+     const multiSkillChartProcessedData = useMemo(() => {
         if (!skillProgressData || !skillProgressData.history || skillProgressData.history.length < 2) {
             return { data: [], keys: [] };
         }
 
-        // Extract skill names (keys) using the skillNames map from the summary
-        const skillKeys = Object.values(skillProgressData.skillNames);
+        const skillKeys = Object.values(skillProgressData.skillNames); // Array of skill names
         const skillIdNameMap = skillProgressData.skillNames; // { skillId: skillName }
 
-        // Transform history points
-        const transformedData = (skillProgressData.history as unknown as SkillProgressHistoryPointScoresDto[]).map((point) => {
-            const dataPoint: MultiProgressChartDataPoint = {
-                timestamp: point.timestamp ?? 0,
-                dateLabel: String(point.dateLabel ?? ''),
-            };
-            // Use the skillNames map to populate scores correctly
-            for (const skillIdStr in skillIdNameMap) {
-                const skillName = skillIdNameMap[skillIdStr];
-                // Use string skillId for accessing scores object keys
-                dataPoint[skillName] = point.scores && typeof point.scores === 'object' ? (point.scores[skillIdStr as keyof typeof point.scores] ?? null) : null;
-            }
-            return dataPoint;
-        });
+        // Map directly over the correct history array type
+        const transformedData = skillProgressData.history.map((point: SkillProgressHistoryPointDto) => { // point IS SkillProgressHistoryPointDto
 
+             // Create the base data point for the chart using correct properties
+             const dataPoint: MultiProgressChartDataPoint = {
+                 timestamp: point.timestamp,   // Use point.timestamp directly
+                 dateLabel: point.dateLabel,   // Use point.dateLabel directly
+             };
+
+             // Populate scores for each skill name
+             // Use Object.entries for safer iteration over skillIdNameMap if needed, or loop through skillKeys
+             for (const skillIdStr in skillIdNameMap) {
+                 const skillName = skillIdNameMap[skillIdStr];
+                 // Access the score using the string ID from the point.scores object
+                 // Ensure point.scores exists before accessing
+                 dataPoint[skillName] = point.scores ? (point.scores[skillIdStr] ?? null) : null;
+             }
+             return dataPoint;
+        });
         return { data: transformedData, keys: skillKeys }; // Return processed data and skill names
     }, [skillProgressData]); // Depend only on the fetched progress summary data
 
