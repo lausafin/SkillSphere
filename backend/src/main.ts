@@ -9,7 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
   app.enableCors({ origin: true, credentials: true });
-  app.useGlobalPipes(new ValidationPipe({ /* ... */ }));
+  // app.useGlobalPipes(new ValidationPipe({ /* ... */ }));
 
   // --- ADD SWAGGER SETUP ---
   const config = new DocumentBuilder()
