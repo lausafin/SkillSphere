@@ -347,12 +347,15 @@ export class SkillsService {
             take: MAX_SKILLS_ON_CHART, // Limit the number of skills
             select: { id: true, name: true, maxScore: true } // Select needed fields
         });
-
+        // Console log for debugging
+        console.log(`User Skills: ${JSON.stringify(userSkills)}`);
         if (userSkills.length === 0) {
             return { skillNames: {}, history: [] }; // Return empty if no skills
         }
 
         const skillIds = userSkills.map(s => s.id);
+        // Console log for debugging
+        console.log(`Skill IDs: ${skillIds}`);
         const skillMap = new Map(userSkills.map(s => [s.id, s])); // Map ID to Skill info
         const skillNamesMap: { [skillId: number]: string } = {};
         userSkills.forEach(s => { skillNamesMap[s.id] = s.name; });
@@ -381,6 +384,8 @@ export class SkillsService {
              });
              initialScores[skillId] = lastLogBefore?.score ?? null;
         }
+        // Console log for debugging
+        console.log(`Initial Scores: ${JSON.stringify(initialScores)}`);
 
         // 5. Aggregate into Time Intervals (Monthly)
         const history: SkillProgressHistoryPointDto[] = [];
@@ -426,6 +431,12 @@ export class SkillsService {
             });
 
             currentIntervalStart = nextIntervalStart; // Move to next month
+
+            // Console log for debugging currentIntervalStart, intervalEndTime, logsThisInterval, pointScores
+            console.log(`Interval Start: ${currentIntervalStart.toLocaleDateString()}, Interval End: ${new Date(intervalEndTime).toLocaleDateString()}`);
+            console.log(`Logs This Interval: ${JSON.stringify(logsThisInterval)}`);
+            console.log(`Last Known Scores: ${JSON.stringify(lastKnownScores)}`);
+            console.log(`Point Scores: ${JSON.stringify(pointScores)}`);
         }
 
         // Ensure at least two points for line chart rendering, duplicate last point if only one exists
