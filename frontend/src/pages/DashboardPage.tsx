@@ -45,8 +45,9 @@ const DashboardPage: React.FC = () => {
         ]).then(([skillsData, progressData]) => {
             if (isMounted) {
                 setSkills(skillsData);
-                console.log('Fetched Skills:', JSON.stringify(skillsData, null, 2));
                 setSkillProgressData(progressData);
+                console.log('Fetched Skills:', JSON.stringify(skillsData, null, 2));
+    
             }
         }).catch(err => {
             if (isMounted) {
