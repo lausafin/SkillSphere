@@ -100,7 +100,7 @@ const DashboardPage: React.FC = () => {
         const skillIdNameMap = skillProgressData.skillNames; // { skillId: skillName }
 
         // Map directly over the correct history array type
-        const transformedData = skillProgressData.history.map((point: SkillProgressHistoryPointDto) => { // point IS SkillProgressHistoryPointDto
+        const transformedData = skillProgressData.history.map((point: SkillProgressHistoryPointScoresDto) => { // point IS SkillProgressHistoryPointDto
 
              // Create the base data point for the chart using correct properties
              const dataPoint: MultiProgressChartDataPoint = {
