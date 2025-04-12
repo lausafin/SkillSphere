@@ -27,22 +27,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<any> {
-    console.log('JWT Strategy Validate - Received Payload:', JSON.stringify(payload)); // Log payload
-    if (!payload || typeof payload.userId !== 'number') { // Basic check
-         console.error('JWT Strategy Error: Invalid payload or userId type.');
-         throw new UnauthorizedException('Invalid token payload.');
-    }
+    // The payload is the decoded JWT content
     const user = await this.prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, email: true, name: true }
+      select: { id: true, email: true, name: true } // Select only needed fields
     });
-    console.log('JWT Strategy Validate - User Found:', user); // Log user found
 
     if (!user) {
-       console.error('JWT Strategy Error: User not found for ID in token.');
       throw new UnauthorizedException('User not found or token invalid.');
     }
-    // Return structure needed by guards/request scope
+    // What you return here is attached to request.user
     return { userId: user.id, email: user.email, name: user.name };
   }
 }

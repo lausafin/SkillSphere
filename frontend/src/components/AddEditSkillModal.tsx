@@ -1,195 +1,159 @@
 // src/components/AddEditSkillModal.tsx
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, Alert as MuiAlert, CircularProgress
-} from '@mui/material'; // Keep Alert/Progress for display
+import { Dialog, DialogTitle, DialogContent, Alert as MuiAlert, CircularProgress } from '@mui/material';
 import SkillForm, { SkillFormData } from './SkillForm';
-import {
-    createSkill, updateSkill, fetchSkillById, Category, // Import Category type
-    CreateSkillDto, UpdateSkillDto // Import DTO types for casting if needed
-} from '../services/api';
+import { createSkill, updateSkill, fetchSkillById } from '../services/api';
+import { CreateSkillDto, UpdateSkillDto } from '../services/api'; // Import DTOs if using assertion
 import { useAuth } from '../context/AuthContext';
-import ManageCategoriesModal from './ManageCategoriesModal'; // Import Manage modal
-import AddCategoryModal from './AddCategoryModal'; // Import Add modal
+import ManageCategoriesModal from './ManageCategoriesModal'; // <-- Import Category Manager
+import AddCategoryModal from './AddCategoryModal'; // <-- Import NEW Add modal
+import { Category } from '../services/api'; // <-- Import Category type
 
-// Custom Alert for potential use (if MuiAlert used directly)
-// const Alert = React.forwardRef<HTMLDivElement, AlertProps>(function Alert(props, ref) {
-//   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
-// });
-
-interface AddEditSkillModalProps {
-    open: boolean;
-    onClose: (refreshNeeded?: boolean) => void;
-    skillIdToEdit?: number | null;
-}
+interface AddEditSkillModalProps { open: boolean; onClose: (refresh?: boolean) => void; skillIdToEdit?: number | null; }
 
 const AddEditSkillModal: React.FC<AddEditSkillModalProps> = ({ open, onClose, skillIdToEdit }) => {
-    const { user } = useAuth();
-    // Type initialData more accurately if possible, using relevant fields from SkillFormData
-    const [initialData, setInitialData] = useState<Partial<Omit<SkillFormData, 'ownership'|'teamId'|'initialScore'>> | undefined>(undefined);
-    const [isLoading, setIsLoading] = useState<boolean>(false); // Loading initial data for edit
-    const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // Form submission
-    const [error, setError] = useState<string | null>(null); // Stores submit/fetch errors
+    const { user } = useAuth(); // Get logged-in user info
+    const [initialData, setInitialData] = useState<Partial<SkillFormData> | undefined>(undefined);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
     const mode = skillIdToEdit ? 'edit' : 'add';
 
-    // State for category modals
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false); // Manage modal
-    const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false); // Quick Add modal
-    const [categoryVersion, setCategoryVersion] = useState(0); // To trigger refetch in form
+    // --- NEW State for Category Modal ---
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    // State to trigger category refresh in SkillForm
+    const [categoryVersion, setCategoryVersion] = useState(0);
 
-    // Fetch initial data effect (for EDIT mode)
+    // --- NEW State for Add Category Modal ---
+    const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+
+    // ... useEffect for fetching initial data ...
+
+    // --- useEffect for fetching initial data (for EDIT mode) ---
     useEffect(() => {
+        // ... (Logic to fetch skill details for edit mode remains largely the same) ...
+        // ... (Ensure it maps fetched data to all relevant fields EXCEPT ownership/teamId) ...
          if (mode === 'edit' && skillIdToEdit && open) {
-             setIsLoading(true);
-             setError(null); // Clear previous errors
-             setInitialData(undefined); // Clear previous initial data
+             setIsLoading(true); setError(null); setInitialData(undefined);
              fetchSkillById(skillIdToEdit)
                  .then((skill) => {
-                     // Map fetched SkillData to the fields expected by SkillForm's initialData
-                     setInitialData({
-                         name: skill.name,
-                         description: skill.description,
-                         maxScore: skill.maxScore,
-                         // initialScore is not set in edit mode
+                     setInitialData({ // Map only fields relevant to editing
+                         name: skill.name, description: skill.description,
+                         currentScore: skill.currentScore, maxScore: skill.maxScore,
                          ratingScaleType: skill.ratingScaleType,
                          categoryId: skill.category?.id ?? null,
                          tags: skill.tags?.map(({ tag }) => tag.name) ?? [],
-                         notes: '', // Or load from description/last log if desired? Clear notes for edit?
-                         // Do NOT set ownership or teamId here
+                         // DO NOT set ownership or teamId here for edit mode
                      });
                  })
-                 .catch((err) => {
-                     console.error("Failed fetch skill for edit:", err);
-                     setError(err.response?.data?.message || 'Failed to load skill data.');
-                 })
+                 .catch(/*...error handling...*/)
                  .finally(() => setIsLoading(false));
          } else if (mode === 'add' && open) {
-              // Ensure state is reset for add mode when modal opens
-              setInitialData(undefined);
-              setError(null);
-              setIsLoading(false);
-              setIsSubmitting(false); // Also reset submitting state
-              setCategoryVersion(0); // Reset category version
+              setInitialData(undefined); setError(null); setIsLoading(false); // Reset for add mode
          }
-    }, [skillIdToEdit, mode, open]); // Dependencies for fetching initial data
+    }, [skillIdToEdit, mode, open]);
 
 
-    // Form Submit Handler
+    // --- Updated Submit Handler ---
     const handleFormSubmit = async (data: SkillFormData) => {
         if (!user && mode === 'add' && data.ownership === 'personal') {
-            setError("Cannot create personal skill: User not identified.");
+            setError("Cannot create personal skill: User not identified."); // Should not happen if logged in
             return;
         }
 
         setIsSubmitting(true); setError(null);
 
-        // Prepare payload based on form data
-        // Use more specific types if possible, matching backend DTOs
-        const apiPayload: Partial<CreateSkillDto | UpdateSkillDto> = {
+        // Prepare data based on ownership (for CREATE) or standard update
+        let apiPayload: any = { // Use 'any' for flexibility or define precise Create/Update DTO types
             name: data.name,
-            description: data.description === null ? undefined : data.description, // Handle null
-            categoryId: data.categoryId, // Pass null or ID
+            description: data.description === null ? undefined : data.description,
+            categoryId: data.categoryId === undefined ? null : data.categoryId,
+            currentScore: data.currentScore,
             maxScore: data.maxScore,
             ratingScaleType: data.ratingScaleType,
             tags: data.tags || [],
-            notes: data.notes ?? undefined, // Include notes
+            // Include notes only if present in SkillFormData and relevant for API
+            notes: data.notes, // Assuming 'notes' might be part of SkillFormData now
         };
 
         if (mode === 'add') {
-            // Include initial score only for create DTO
-            (apiPayload as Partial<CreateSkillDto>).initialScore = data.initialScore ?? undefined;
-            // Set ownership
             if (data.ownership === 'team' && data.teamId) {
-                (apiPayload as Partial<CreateSkillDto>).teamId = data.teamId;
-                (apiPayload as Partial<CreateSkillDto>).userId = null;
+                apiPayload.teamId = data.teamId;
+                apiPayload.userId = null; // Explicitly null for team skill
             } else {
-                (apiPayload as Partial<CreateSkillDto>).userId = user?.id;
-                (apiPayload as Partial<CreateSkillDto>).teamId = null;
+                // Personal skill (or default if something went wrong)
+                apiPayload.userId = user?.id; // Assign current user ID
+                apiPayload.teamId = null; // Explicitly null for personal skill
             }
         }
-        // Note: Update payload (apiPayload as UpdateSkillDto) should not contain
-        // userId, teamId, or initialScore if backend ignores them for updates.
+        // NOTE: We generally DO NOT change ownership (userId/teamId) during an UPDATE operation.
+        // The backend `updateSkill` should likely ignore userId/teamId in the payload.
 
         try {
             if (mode === 'edit' && skillIdToEdit) {
-                await updateSkill(skillIdToEdit, apiPayload as UpdateSkillDto);
+                // Pass only updatable fields
+                await updateSkill(skillIdToEdit, apiPayload as UpdateSkillDto); // Cast if needed
             } else {
-                await createSkill(apiPayload as CreateSkillDto);
+                // Pass full payload for creation
+                await createSkill(apiPayload as CreateSkillDto); // Cast if needed
             }
-            onClose(true); // Close modal and signal refresh needed
+            onClose(true);
         } catch (err: any) {
             console.error(`Failed to ${mode} skill:`, err);
-            setError(err.response?.data?.message || `Failed to ${mode} skill.`); // Set error state to display
+            setError(err.response?.data?.message || `Failed to ${mode} skill.`);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Cancel Handler
-    const handleCancel = () => {
-         if (!isSubmitting) {
-             setError(null); // Clear error on cancel
-             onClose(false); // Close modal without signalling refresh
-         }
-    };
+    const handleCancel = () => { if (!isSubmitting) onClose(false); };
 
-    // Manage Categories Modal Handlers
-    const handleOpenCategoryManager = () => setIsCategoryModalOpen(true);
     const handleCloseCategoryManager = (categoriesChanged?: boolean) => {
         setIsCategoryModalOpen(false);
-        if (categoriesChanged) setCategoryVersion(prev => prev + 1); // Increment version to trigger refetch
+        if (categoriesChanged) setCategoryVersion(prev => prev + 1);
     };
 
-    // Add Category Modal Handlers
-    const handleOpenAddCategory = () => setIsAddCategoryModalOpen(true);
-    const handleCloseAddCategory = (newCategory?: Category) => {
+    // --- NEW Add Category Modal Handlers ---
+    const handleOpenAddCategory = () => {
+        setIsAddCategoryModalOpen(true);
+    };
+    const handleCloseAddCategory = (newCategory?: Category) => { // Expect new category back
         setIsAddCategoryModalOpen(false);
         if (newCategory) {
-            setCategoryVersion(prev => prev + 1); // Increment version to trigger refetch
-            // TODO Optional: Auto-select newCategory.id in the form? Requires passing setValue down.
+            // A new category was added, increment version to refresh SkillForm dropdown
+            setCategoryVersion(prev => prev + 1);
+            // TODO: Optionally auto-select the newly added category in the SkillForm?
+            // This would require passing a callback down to SkillForm to set its value.
+            // Example: setSelectedCategoryId(newCategory.id); // Need state for this
         }
     };
 
-    // --- Render ---
     return (
         <>
-            {/* Main Add/Edit Skill Modal */}
             <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
                 <DialogTitle>{mode === 'add' ? 'Add New Skill' : 'Edit Skill'}</DialogTitle>
                 <DialogContent>
-                    {/* Loading indicator for initial data fetch in edit mode */}
                      {isLoading && <CircularProgress sx={{ display: 'block', margin: 'auto', mb: 2 }}/>}
-                     {/* Display general fetch/submit errors */}
                      {error && !isLoading && <MuiAlert severity="error" sx={{ mb: 2 }}>{error}</MuiAlert>}
 
-                    {/* Render form only when not loading initial data (for edit) */}
                     {!isLoading && (
                         <SkillForm
-                            // Add categoryVersion to key to help force re-render/refetch on category change
                             key={mode === 'edit' ? `edit-${skillIdToEdit}-${categoryVersion}` : `add-${categoryVersion}`}
-                            initialData={mode === 'edit' ? initialData : undefined} // Pass initialData only for edit
+                                                        initialData={mode === 'edit' ? initialData : undefined}
                             onSubmit={handleFormSubmit}
                             onCancel={handleCancel}
                             isSubmitting={isSubmitting}
                             mode={mode}
-                            onManageCategories={handleOpenCategoryManager} // Pass manage handler
-                            onAddCategory={handleOpenAddCategory}       // Pass add handler
-                            categoryVersion={categoryVersion}             // Pass version counter
+                            onAddCategory={handleOpenAddCategory} // <-- Pass NEW add handler
+                            categoryVersion={categoryVersion}
                         />
                     )}
                 </DialogContent>
-                {/* Actions removed as SkillForm has Cancel/Submit buttons */}
             </Dialog>
 
-            {/* Secondary Modals */}
-            <ManageCategoriesModal
-                 open={isCategoryModalOpen}
-                 onClose={handleCloseCategoryManager}
-            />
-            <AddCategoryModal
-                open={isAddCategoryModalOpen}
-                onClose={handleCloseAddCategory}
-            />
+            {/* Render BOTH Modals */}
+            <ManageCategoriesModal open={isCategoryModalOpen} onClose={handleCloseCategoryManager} />
+            <AddCategoryModal open={isAddCategoryModalOpen} onClose={handleCloseAddCategory} />
         </>
     );
 };

@@ -1,143 +1,175 @@
 // src/pages/DashboardPage.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-    Box, Typography, Paper, Grid, CircularProgress, Alert as MuiAlert, AlertProps, Button, List, ListItem, ListItemText // Keep required MUI imports
+    Box, Typography, Paper, Grid, CircularProgress, Alert, Button, List, ListItem, ListItemText
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// Import types and functions from api service
-import {
-    fetchSkills,
-    SkillData, // Main data type for skills list
-    SkillProgressSummaryDto, // Type for the history summary endpoint response
-    fetchSkillProgressSummary // API function for history summary
-} from '../services/api';
+import { fetchSkills } from '../services/api'; // Assuming fetchSkills exists
+import { SkillData } from '../components/SkillCard'; // Base SkillData type
 import SkillRadarChart from '../components/SkillRadarChart';
-import CategoryPieChart from '../components/CategoryPieChart'; // Keep Pie Chart import
-import MultiSkillProgressChart from '../components/MultiSkillProgressChart'; // Keep Multi chart import
-// Import type needed for processing history data, ensure it's exported from chart component
-import type { MultiProgressChartDataPoint } from '../components/MultiSkillProgressChart';
-// Import type needed from API for history data structure
-import { MemberSkillHistoryPointDto } from '../services/api'; // Import necessary sub-types
+// import CategoryPieChart from '../components/CategoryPieChart';
+import MultiSkillProgressChart, { MultiProgressChartDataPoint } from '../components/MultiSkillProgressChart'; // Import multi-line chart and its data type
 
+// Define Log data structure (mirroring backend or expected structure)
+// This might need adjustment based on your actual SkillProgressLog model/API response
+interface ProgressLogData {
+    id: number;
+    timestamp: string; // ISO Date string
+    score: number;
+    notes?: string | null;
+    timeSpentMinutes?: number | null;
+}
 
-// Custom Alert for potential future use
-const Alert = React.forwardRef<HTMLDivElement, AlertProps>(function Alert(props, ref) {
-  return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
-});
+// *** IMPORTANT ASSUMPTION FOR SIMULATION: Assume SkillData now includes progressLogs ***
+// This structure is likely NOT what fetchSkills returns by default and is INEFFICIENT.
+// In a real app, use a dedicated backend endpoint for aggregated progress.
+interface SkillDataWithLogs extends SkillData {
+    progressLogs?: ProgressLogData[];
+}
+
 
 const DashboardPage: React.FC = () => {
     const { user } = useAuth();
-    const [skills, setSkills] = useState<SkillData[]>([]); // For summary cards/list
-    const [skillProgressData, setSkillProgressData] = useState<SkillProgressSummaryDto | null>(null); // For multi-line chart
-    const [isLoading, setIsLoading] = useState(true); // Combined loading state
+    const [skills, setSkills] = useState<SkillDataWithLogs[]>([]); // Use extended type
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // --- Fetch ALL Dashboard Data ---
-    // --- Fetch ALL Dashboard Data ---
     useEffect(() => {
-        let isMounted = true;
         setIsLoading(true); setError(null);
-        setSkills([]); setSkillProgressData(null);
-    
-        Promise.all([
-            fetchSkills(),
-            fetchSkillProgressSummary()
-        ]).then(([skillsData, progressData]) => { // <-- CORRECT: Destructure both results
-            if (isMounted) {
-                setSkills(skillsData);
-                setSkillProgressData(progressData); // <-- CORRECT: Set state with the second result
-            }
-        }).catch(err => {
-            if (isMounted) {
-                console.error("Failed to load dashboard data:", err);
-                setError(err.response?.data?.message || 'Failed to load dashboard data.');
-            }
-        }).finally(() => {
-            if (isMounted) setIsLoading(false);
-        });
-    
-        return () => { isMounted = false; };
-    }, []); // Fetch only on mount
+        // *** SIMULATED FETCH - Replace with efficient method later ***
+        fetchSkills() // Assume this fetches skills
+            .then(data => {
+                //  // Manually add dummy logs if fetchSkills doesn't return them (for testing chart only)
+                //  // THIS IS VERY INEFFICIENT - DO NOT USE IN PRODUCTION
+                //  // Replace this with a proper fetch for logs or aggregated data
+                //  const skillsWithLogs = data.map(skill => ({
+                //      ...skill,
+                //      // Example: Add some dummy logs if none exist - REMOVE/REPLACE THIS
+                //      progressLogs: skill.progressLogs && skill.progressLogs.length > 0 ? skill.progressLogs : [
+                //          { id: Math.random(), score: skill.currentScore, timestamp: skill.updatedAt, notes: 'Current' },
+                //          // Add more dummy past logs for testing? Ensure timestamps are valid ISO strings
+                //           { id: Math.random(), score: Math.max(0, skill.currentScore - 2), timestamp: new Date(Date.parse(skill.updatedAt) - 60*60*24*30*1000).toISOString(), notes: 'Previous' }, // ~1 month ago
+                //           { id: Math.random(), score: Math.max(0, skill.currentScore - 4), timestamp: new Date(Date.parse(skill.updatedAt) - 60*60*24*90*1000).toISOString(), notes: 'Earlier' }, // ~3 months ago
+                //      ]
+                //  }));
+                //  setSkills(skillsWithLogs);
+                setSkills(data); // Use this line if fetchSkills *does* return logs in the correct format
+            })
+            .catch(err => { console.error(err); setError('Failed to load dashboard data.'); })
+            .finally(() => setIsLoading(false));
+    }, []);
 
     // --- Prepare data for Radar Chart ---
     const radarChartData = useMemo(() => {
         if (!skills || skills.length < 3) return [];
-        const sortedSkills = [...skills].sort((a, b) =>
-            new Date(b.latestScoreData?.timestamp || b.updatedAt).getTime() -
-            new Date(a.latestScoreData?.timestamp || a.updatedAt).getTime()
-        );
-        const skillsForChart = sortedSkills.slice(0, 7);
-        if (skillsForChart.length < 3) return [];
-        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
+        const sortedSkills = [...skills].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        const skillsForChart = sortedSkills.slice(0, 7); // Use up to 7 skills
+        if (skillsForChart.length < 3) return []; // Need at least 3 for radar
         return skillsForChart.map(skill => ({
             subject: skill.name,
-            score: skill.latestScoreData?.score ?? 0,
+            score: skill.currentScore,
             fullMark: skill.maxScore,
         }));
     }, [skills]);
 
     // --- Prepare data for Pie Chart (Category Distribution) ---
-    const categoryPieChartData = useMemo(() => {
-        if (!skills || skills.length === 0) return [];
-        const counts: { [key: string]: number } = {};
-        let uncategorizedCount = 0;
-        skills.forEach(skill => {
-            if (skill.category?.name) { counts[skill.category.name] = (counts[skill.category.name] || 0) + 1; }
-            else { uncategorizedCount++; }
-        });
-        const pieData = Object.entries(counts).map(([name, value]) => ({ name, value }));
-        if (uncategorizedCount > 0) { pieData.push({ name: 'Uncategorized', value: uncategorizedCount }); }
-        pieData.sort((a, b) => b.value - a.value);
-        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
-        return pieData;
-    }, [skills]);
+    // const categoryPieChartData = useMemo(() => {
+    //     if (!skills || skills.length === 0) return [];
+    //     const counts: { [key: string]: number } = {};
+    //     let uncategorizedCount = 0;
+    //     skills.forEach(skill => {
+    //         if (skill.category?.name) { counts[skill.category.name] = (counts[skill.category.name] || 0) + 1; }
+    //         else { uncategorizedCount++; }
+    //     });
+    //     const pieData = Object.entries(counts).map(([name, value]) => ({ name, value }));
+    //     if (uncategorizedCount > 0) { pieData.push({ name: 'Uncategorized', value: uncategorizedCount }); }
+    //     pieData.sort((a, b) => b.value - a.value); // Sort largest slice first
+    //     return pieData;
+    // }, [skills]);
 
-     // --- Prepare data for Multi-Skill Line Chart ---
-     const multiSkillChartProcessedData = useMemo(() => {
-        if (!skillProgressData || !skillProgressData.history || skillProgressData.history.length < 2) {
-            return { data: [], keys: [] };
+    // --- Prepare data for Multi-Skill Line Chart (Last 12 Months - Frontend Simulation) ---
+    const multiSkillChartProcessedData = useMemo(() => {
+        if (!skills || skills.length === 0) return { data: [], keys: [] };
+
+        const endDate = new Date(); // Today
+        const startDate = new Date(); // 1 year ago, start of month
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+
+        const MAX_SKILLS_ON_CHART = 5;
+        const skillsToChart = skills /* ... filter/sort logic ... */ .slice(0, MAX_SKILLS_ON_CHART);
+
+        if (skillsToChart.length === 0) return { data: [], keys: [] };
+        const skillKeys = skillsToChart.map(s => s.name);
+
+        const chartData: MultiProgressChartDataPoint[] = [];
+        const lastKnownScores: { [skillId: number]: number | null } = {}; // Track last known score
+
+        // Initialize lastKnownScores with the latest score *before* the overall start date
+        skillsToChart.forEach(skill => {
+            const logsBeforeStart = (skill.progressLogs || [])
+                .filter(log => new Date(log.timestamp).getTime() < startDate.getTime()) // Strictly BEFORE start date
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            lastKnownScores[skill.id] = logsBeforeStart.length > 0 ? logsBeforeStart[0].score : null;
+        });
+
+        let currentIntervalStart = new Date(startDate);
+
+        while (currentIntervalStart <= endDate) {
+            // Determine the end of the current interval (start of next month, or endDate if last interval)
+            let nextIntervalStart = new Date(currentIntervalStart);
+            nextIntervalStart.setMonth(nextIntervalStart.getMonth() + 1);
+            // Ensure the interval doesn't go beyond the overall endDate for filtering
+            const intervalEnd = (nextIntervalStart > endDate) ? endDate.getTime() : nextIntervalStart.getTime();
+
+
+            const point: MultiProgressChartDataPoint = {
+                timestamp: currentIntervalStart.getTime(), // Timestamp for the X-axis point (start of month)
+                dateLabel: currentIntervalStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) // Label for the point
+            };
+
+            for (const skill of skillsToChart) {
+                // Find the latest log *within* the current interval [currentIntervalStart, intervalEnd)
+                // Note: Using < intervalEnd to avoid including logs exactly at the start of the next month
+                const logsInOrBeforeInterval = (skill.progressLogs || [])
+                    .filter(log => new Date(log.timestamp).getTime() < intervalEnd) // Log occurred BEFORE start of next interval
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Most recent first
+
+                let scoreForPoint: number | null = null;
+                if (logsInOrBeforeInterval.length > 0) {
+                    // Found a log before the end of this interval
+                    scoreForPoint = logsInOrBeforeInterval[0].score;
+                    lastKnownScores[skill.id] = scoreForPoint; // Update last known score
+                } else {
+                    // No log found within or before this interval ENDPOINT, use the last known score carried forward
+                    scoreForPoint = lastKnownScores[skill.id] ?? null;
+                }
+
+                // Normalize score to percentage
+                const normalizedScore = (scoreForPoint !== null && skill.maxScore > 0)
+                    ? (scoreForPoint / skill.maxScore) * 100
+                    : null;
+
+                point[skill.name] = normalizedScore;
+            }
+
+            chartData.push(point);
+            currentIntervalStart = nextIntervalStart; // Move to the start of the next month
         }
 
-        const skillKeys = Object.values(skillProgressData.skillNames); // Array of skill names
-        const skillIdNameMap = skillProgressData.skillNames; // { skillId: skillName }
 
-        // Map directly over the correct history array type
-        const transformedData = skillProgressData.history.map((point: MemberSkillHistoryPointDto) => { // point IS SkillProgressHistoryPointDto
+        return { data: chartData.length >= 2 ? chartData : [], keys: skillKeys };
 
-             // Create the base data point for the chart using correct properties
-             const dataPoint: MultiProgressChartDataPoint = {
-                 timestamp: point.timestamp,   // Use point.timestamp directly
-                 dateLabel: point.dateLabel,   // Use point.dateLabel directly
-             };
-
-             // Populate scores for each skill name
-             // Use Object.entries for safer iteration over skillIdNameMap if needed, or loop through skillKeys
-             for (const skillIdStr in skillIdNameMap) {
-                 const skillName = skillIdNameMap[skillIdStr];
-                 // Access the score using the string ID from the point.scores object
-                 // Ensure point.scores exists before accessing
-                 dataPoint[skillName] = point.scores ? (point.scores[skillIdStr] ?? null) : null;
-             }
-             return dataPoint;
-        });
-        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
-        return { data: transformedData, keys: skillKeys }; // Return processed data and skill names
-    }, [skillProgressData]); // Depend only on the fetched progress summary data
+    }, [skills]);
 
 
     // --- Other calculations ---
     const totalSkills = skills.length;
-    const averageScore = totalSkills > 0 ? (skills.reduce((sum, skill) => {
-            const score = skill.latestScoreData?.score;
-            const max = skill.maxScore > 0 ? skill.maxScore : 1;
-            return sum + ((score ?? 0) / max);
-        }, 0) / totalSkills * 10)
-        : 0;
-    const recentlyUpdated = [...skills].sort((a, b) =>
-        new Date(b.latestScoreData?.timestamp || b.updatedAt).getTime() -
-        new Date(a.latestScoreData?.timestamp || a.updatedAt).getTime()
-    ).slice(0, 5);
+    const averageScore = totalSkills > 0 ? (skills.reduce((sum, skill) => sum + (skill.maxScore > 0 ? (skill.currentScore / skill.maxScore) : 0), 0) / totalSkills * 10) : 0;
+    // Use already sorted skills if sort order is guaranteed, otherwise sort here
+    const recentlyUpdated = [...skills].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
 
      // --- Render ---
     return (
@@ -158,50 +190,41 @@ const DashboardPage: React.FC = () => {
                         <Paper elevation={2} sx={{ p: 2, textAlign: 'center', height: '100%' }}>
                             <Typography variant="h6">Average Score</Typography>
                             <Typography variant="h3">{averageScore.toFixed(1)} / 10</Typography>
-                            <Typography variant="body2" color="textSecondary">(Based on latest log %)</Typography>
+                            <Typography variant="body2" color="textSecondary">(Across all skills)</Typography>
                         </Paper>
                     </Grid>
                      <Grid item xs={12} md={4}>
                          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
                              <Typography variant="h6" gutterBottom>Recently Updated</Typography>
                              {recentlyUpdated.length === 0 ? <Typography color="textSecondary">No skills tracked yet.</Typography> : (
-                                 <List dense> {recentlyUpdated.map(skill => (
-                                     <ListItem key={skill.id} disablePadding>
-                                         <ListItemText primary={skill.name} secondary={`Score: ${skill.latestScoreData?.score ?? '--'}/${skill.maxScore}`} />
-                                     </ListItem> ))}
-                                 </List>
+                                 <List dense> {recentlyUpdated.map(skill => ( <ListItem key={skill.id} disablePadding> <ListItemText primary={skill.name} secondary={`Score: ${skill.currentScore}/${skill.maxScore}`} /> </ListItem> ))} </List>
                              )}
                          </Paper>
                      </Grid>
 
                     {/* --- Row 2: Pie & Radar --- */}
-                     <Grid item xs={12} md={6}> {/* Pie Chart */}
-                        <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                            <CategoryPieChart data={categoryPieChartData} title="Skills by Category" />
-                         </Paper>
-                     </Grid>
-                     <Grid item xs={12} md={6}> {/* Radar Chart */}
+                     {/* <Grid item xs={12} md={6}> Pie takes half width on medium screens */}
+                        {/* <Paper elevation={2} sx={{ p: 2, height: '100%' }}> */}
+                            {/* <CategoryPieChart data={categoryPieChartData} title="Skills by Category" /> */}
+                         {/* </Paper> */}
+                     {/* </Grid> */}
+                     <Grid item xs={12} md={6}> {/* Radar takes other half */}
                          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                             <SkillRadarChart data={radarChartData} title="Recent Skill Snapshot (Score)" />
+                             <SkillRadarChart data={radarChartData} title="Recent Skill Snapshot"/>
                          </Paper>
                      </Grid>
 
                      {/* --- Row 3: Multi-Skill Progress --- */}
-                     <Grid item xs={12}> {/* Full width */}
-                         <Paper elevation={2} sx={{ p: 2, minHeight: 350, display: 'flex', flexDirection: 'column' }}>
+                     <Grid item xs={12} md={8} lg={6}> {/* Full width */}
+                         <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
                              <MultiSkillProgressChart
-                                 data={multiSkillChartProcessedData.data} // Use processed data
-                                 skillKeys={multiSkillChartProcessedData.keys} // Use processed keys
-                                 title="Personal Skill Progress Over Last Year (%)"
+                                 data={multiSkillChartProcessedData.data}
+                                 skillKeys={multiSkillChartProcessedData.keys}
+                                 title="Skill Progress Over Last Year (%)"
                              />
-                             {/* Updated condition to check fetched data */}
-                             {(!skillProgressData || multiSkillChartProcessedData.data.length === 0) && !isLoading && (
-                                <Typography color="textSecondary" sx={{textAlign: 'center', p:2, mt: 2}}>
-                                    Not enough progress history found for personal skills in the last year.
-                                </Typography>
-                             )}
                          </Paper>
                      </Grid>
+
                 </Grid>
             )}
         </Box>

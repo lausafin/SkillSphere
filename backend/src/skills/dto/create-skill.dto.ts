@@ -25,7 +25,8 @@ export class CreateSkillDto {
     @IsNumber() // Use IsNumber for flexibility (allows floats if needed later) or IsInt
     @Min(0)
     @Type(() => Number)
-    initialScore?: number;
+    // We might need cross-field validation for currentScore <= maxScore, often done in service or custom validator
+    currentScore?: number;
 
     @IsOptional()
     @IsInt()
