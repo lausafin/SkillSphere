@@ -34,20 +34,19 @@ const DashboardPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     // --- Fetch ALL Dashboard Data ---
+    // --- Fetch ALL Dashboard Data ---
     useEffect(() => {
         let isMounted = true;
         setIsLoading(true); setError(null);
-        setSkills([]); setSkillProgressData(null); // Reset data
-
+        setSkills([]); setSkillProgressData(null);
+    
         Promise.all([
-            fetchSkills(), // Fetches SkillData[] (includes latestScoreData)
-            fetchSkillProgressSummary() // Fetches SkillProgressSummaryDto
-        ]).then(([skillsData, progressData]) => {
+            fetchSkills(),
+            fetchSkillProgressSummary()
+        ]).then(([skillsData, progressData]) => { // <-- CORRECT: Destructure both results
             if (isMounted) {
                 setSkills(skillsData);
-                setSkillProgressData(progressData);
-                console.log('Fetched Skills:', JSON.stringify(skillsData, null, 2));
-    
+                setSkillProgressData(progressData); // <-- CORRECT: Set state with the second result
             }
         }).catch(err => {
             if (isMounted) {
@@ -57,8 +56,8 @@ const DashboardPage: React.FC = () => {
         }).finally(() => {
             if (isMounted) setIsLoading(false);
         });
-
-        return () => { isMounted = false; }; // Cleanup
+    
+        return () => { isMounted = false; };
     }, []); // Fetch only on mount
 
     // --- Prepare data for Radar Chart ---
