@@ -45,6 +45,7 @@ const DashboardPage: React.FC = () => {
         ]).then(([skillsData, progressData]) => {
             if (isMounted) {
                 setSkills(skillsData);
+                console.log('Fetched Skills:', JSON.stringify(skillsData, null, 2));
                 setSkillProgressData(progressData);
             }
         }).catch(err => {
@@ -68,6 +69,7 @@ const DashboardPage: React.FC = () => {
         );
         const skillsForChart = sortedSkills.slice(0, 7);
         if (skillsForChart.length < 3) return [];
+        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
         return skillsForChart.map(skill => ({
             subject: skill.name,
             score: skill.latestScoreData?.score ?? 0,
@@ -87,6 +89,7 @@ const DashboardPage: React.FC = () => {
         const pieData = Object.entries(counts).map(([name, value]) => ({ name, value }));
         if (uncategorizedCount > 0) { pieData.push({ name: 'Uncategorized', value: uncategorizedCount }); }
         pieData.sort((a, b) => b.value - a.value);
+        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
         return pieData;
     }, [skills]);
 
@@ -118,6 +121,7 @@ const DashboardPage: React.FC = () => {
              }
              return dataPoint;
         });
+        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
         return { data: transformedData, keys: skillKeys }; // Return processed data and skill names
     }, [skillProgressData]); // Depend only on the fetched progress summary data
 
