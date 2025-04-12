@@ -9,16 +9,16 @@ import { useAuth } from '../context/AuthContext';
 import {
     fetchSkills,
     SkillData, // Main data type for skills list
-    // SkillProgressSummaryDto, // Type for the history summary endpoint response
+    SkillProgressSummaryDto, // Type for the history summary endpoint response
     fetchSkillProgressSummary // API function for history summary
 } from '../services/api';
 import SkillRadarChart from '../components/SkillRadarChart';
 import CategoryPieChart from '../components/CategoryPieChart'; // Keep Pie Chart import
-// import MultiSkillProgressChart from '../components/MultiSkillProgressChart'; // Keep Multi chart import
+import MultiSkillProgressChart from '../components/MultiSkillProgressChart'; // Keep Multi chart import
 // Import type needed for processing history data, ensure it's exported from chart component
-// import type { MultiProgressChartDataPoint } from '../components/MultiSkillProgressChart';
+import type { MultiProgressChartDataPoint } from '../components/MultiSkillProgressChart';
 // Import type needed from API for history data structure
-// import { MemberSkillHistoryPointDto } from '../services/api'; // Import necessary sub-types
+import { MemberSkillHistoryPointDto } from '../services/api'; // Import necessary sub-types
 
 
 // Custom Alert for potential future use
@@ -29,7 +29,7 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(function Alert(props,
 const DashboardPage: React.FC = () => {
     const { user } = useAuth();
     const [skills, setSkills] = useState<SkillData[]>([]); // For summary cards/list
-    // const [setSkillProgressData] = useState<SkillProgressSummaryDto | null>(null); // For multi-line chart
+    const [skillProgressData, setSkillProgressData] = useState<SkillProgressSummaryDto | null>(null); // For multi-line chart
     const [isLoading, setIsLoading] = useState(true); // Combined loading state
     const [error, setError] = useState<string | null>(null);
 
@@ -37,15 +37,16 @@ const DashboardPage: React.FC = () => {
     useEffect(() => {
         let isMounted = true;
         setIsLoading(true); setError(null);
-        setSkills([]);
+        setSkills([]); setSkillProgressData(null); // Reset data
 
         Promise.all([
             fetchSkills(), // Fetches SkillData[] (includes latestScoreData)
             fetchSkillProgressSummary() // Fetches SkillProgressSummaryDto
-        ]).then(([skillsData]) => {
+        ]).then(([skillsData, progressData]) => {
             if (isMounted) {
                 setSkills(skillsData);
                 console.log('Fetched Skills:', JSON.stringify(skillsData, null, 2));
+                setSkillProgressData(progressData);
             }
         }).catch(err => {
             if (isMounted) {
@@ -92,37 +93,37 @@ const DashboardPage: React.FC = () => {
         return pieData;
     }, [skills]);
 
-    //  // --- Prepare data for Multi-Skill Line Chart ---
-    //  const multiSkillChartProcessedData = useMemo(() => {
-    //     if (!skillProgressData || !skillProgressData.history || skillProgressData.history.length < 2) {
-    //         return { data: [], keys: [] };
-    //     }
+     // --- Prepare data for Multi-Skill Line Chart ---
+     const multiSkillChartProcessedData = useMemo(() => {
+        if (!skillProgressData || !skillProgressData.history || skillProgressData.history.length < 2) {
+            return { data: [], keys: [] };
+        }
 
-    //     const skillKeys = Object.values(skillProgressData.skillNames); // Array of skill names
-    //     const skillIdNameMap = skillProgressData.skillNames; // { skillId: skillName }
+        const skillKeys = Object.values(skillProgressData.skillNames); // Array of skill names
+        const skillIdNameMap = skillProgressData.skillNames; // { skillId: skillName }
 
-    //     // Map directly over the correct history array type
-    //     const transformedData = skillProgressData.history.map((point: MemberSkillHistoryPointDto) => { // point IS SkillProgressHistoryPointDto
+        // Map directly over the correct history array type
+        const transformedData = skillProgressData.history.map((point: MemberSkillHistoryPointDto) => { // point IS SkillProgressHistoryPointDto
 
-    //          // Create the base data point for the chart using correct properties
-    //          const dataPoint: MultiProgressChartDataPoint = {
-    //              timestamp: point.timestamp,   // Use point.timestamp directly
-    //              dateLabel: point.dateLabel,   // Use point.dateLabel directly
-    //          };
+             // Create the base data point for the chart using correct properties
+             const dataPoint: MultiProgressChartDataPoint = {
+                 timestamp: point.timestamp,   // Use point.timestamp directly
+                 dateLabel: point.dateLabel,   // Use point.dateLabel directly
+             };
 
-    //          // Populate scores for each skill name
-    //          // Use Object.entries for safer iteration over skillIdNameMap if needed, or loop through skillKeys
-    //          for (const skillIdStr in skillIdNameMap) {
-    //              const skillName = skillIdNameMap[skillIdStr];
-    //              // Access the score using the string ID from the point.scores object
-    //              // Ensure point.scores exists before accessing
-    //              dataPoint[skillName] = point.scores ? (point.scores[skillIdStr] ?? null) : null;
-    //          }
-    //          return dataPoint;
-    //     });
-    //     console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
-    //     return { data: transformedData, keys: skillKeys }; // Return processed data and skill names
-    // }, [skillProgressData]); // Depend only on the fetched progress summary data
+             // Populate scores for each skill name
+             // Use Object.entries for safer iteration over skillIdNameMap if needed, or loop through skillKeys
+             for (const skillIdStr in skillIdNameMap) {
+                 const skillName = skillIdNameMap[skillIdStr];
+                 // Access the score using the string ID from the point.scores object
+                 // Ensure point.scores exists before accessing
+                 dataPoint[skillName] = point.scores ? (point.scores[skillIdStr] ?? null) : null;
+             }
+             return dataPoint;
+        });
+        console.log('Fetched Skills:', JSON.stringify(skills, null, 2));
+        return { data: transformedData, keys: skillKeys }; // Return processed data and skill names
+    }, [skillProgressData]); // Depend only on the fetched progress summary data
 
 
     // --- Other calculations ---
@@ -186,21 +187,21 @@ const DashboardPage: React.FC = () => {
                      </Grid>
 
                      {/* --- Row 3: Multi-Skill Progress --- */}
-                     {/* <Grid item xs={12}> Full width */}
-                         {/* <Paper elevation={2} sx={{ p: 2, minHeight: 350, display: 'flex', flexDirection: 'column' }}> */}
-                             {/* <MultiSkillProgressChart */}
-                                {/* //  data={multiSkillChartProcessedData.data} // Use processed data */}
-                                {/* //  skillKeys={multiSkillChartProcessedData.keys} // Use processed keys */}
-                                {/* //  title="Personal Skill Progress Over Last Year (%)" */}
-                             {/* /> */}
+                     <Grid item xs={12}> {/* Full width */}
+                         <Paper elevation={2} sx={{ p: 2, minHeight: 350, display: 'flex', flexDirection: 'column' }}>
+                             <MultiSkillProgressChart
+                                 data={multiSkillChartProcessedData.data} // Use processed data
+                                 skillKeys={multiSkillChartProcessedData.keys} // Use processed keys
+                                 title="Personal Skill Progress Over Last Year (%)"
+                             />
                              {/* Updated condition to check fetched data */}
-                             {/* {(!skillProgressData || multiSkillChartProcessedData.data.length === 0) && !isLoading && ( */}
-                                {/* // <Typography color="textSecondary" sx={{textAlign: 'center', p:2, mt: 2}}> */}
-                                    {/* Not enough progress history found for personal skills in the last year. */}
-                                {/* </Typography> */}
-                            {/* //   */}
-                         {/* </Paper> */}
-                     {/* </Grid> */}
+                             {(!skillProgressData || multiSkillChartProcessedData.data.length === 0) && !isLoading && (
+                                <Typography color="textSecondary" sx={{textAlign: 'center', p:2, mt: 2}}>
+                                    Not enough progress history found for personal skills in the last year.
+                                </Typography>
+                             )}
+                         </Paper>
+                     </Grid>
                 </Grid>
             )}
         </Box>
