@@ -333,143 +333,30 @@ export class SkillsService {
             }
         });
     }
-
-    // --- Method for Personal Skill Progress Summary ---
+    // --- TEMPORARY SIMPLIFIED Summary Method ---
     async getPersonalSkillProgressSummary(userId: number): Promise<SkillProgressSummaryDto> {
-        console.log(`DEBUG: getPersonalSkillProgressSummary called for UserID: ${userId}`); // Log entry
-        const MAX_SKILLS_ON_CHART = 7; // Max skills to show
+        console.log(`DEBUG: Using SIMPLIFIED getPersonalSkillProgressSummary for UserID: ${userId}`);
 
-        // 1. Find user's personal skills, ordered by recent activity
-        const userSkills = await this.prisma.skill.findMany({
-            where: { userId: userId },
-            orderBy: { updatedAt: 'desc' },
-            take: MAX_SKILLS_ON_CHART,
-            select: { id: true, name: true, maxScore: true }
-        });
-        console.log(`DEBUG: Found ${userSkills.length} personal skills.`);
+        // Hardcode a minimal valid response
+        const dummyData: SkillProgressSummaryDto = {
+            skillNames: { 1: "Test Skill A", 2: "Test Skill B" }, // Example skill names map
+            history: [
+                {
+                    timestamp: new Date(2024, 0, 1).getTime(), // Jan 1st 2024 timestamp
+                    dateLabel: "Jan '24",
+                    scores: { "1": 20, "2": 30 } // Example scores (string keys)
+                },
+                {
+                    timestamp: new Date(2024, 1, 1).getTime(), // Feb 1st 2024 timestamp
+                    dateLabel: "Feb '24",
+                    scores: { "1": 25, "2": null } // Example score update and a null
+                }
+            ]
+        };
 
-        if (userSkills.length === 0) {
-            console.log("DEBUG: No personal skills found, returning empty summary.");
-            return { skillNames: {}, history: [] }; // Return empty if no skills
-        }
-
-        const skillIds = userSkills.map(s => s.id);
-        const skillMap = new Map(userSkills.map(s => [s.id, s])); // Map ID to Skill info
-        const skillNamesMap: { [skillId: number]: string } = {};
-        userSkills.forEach(s => { skillNamesMap[s.id] = s.name; });
-        console.log(`DEBUG: Skill IDs for summary: [${skillIds.join(', ')}]`);
-
-        // 2. Define Time Range (Last Year)
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setFullYear(endDate.getFullYear() - 1);
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        console.log(`DEBUG: Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
-        // 3. Fetch Relevant Logs for THIS USER and THESE SKILLS within the date range
-        const logs = await this.prisma.skillProgressLog.findMany({
-            where: {
-                userId: userId,
-                skillId: { in: skillIds },
-                timestamp: { gte: startDate } // Logs within the last year
-            },
-            orderBy: { timestamp: 'asc' }, // Chronological order
-            select: { skillId: true, score: true, timestamp: true }
-        });
-        console.log(`DEBUG: Found ${logs.length} logs within the date range.`);
-
-        // 4. Fetch latest score *before* startDate for initialization for each skill
-        const initialScores: { [skillId: number]: number | null } = {};
-        for (const skillId of skillIds) {
-             const lastLogBefore = await this.prisma.skillProgressLog.findFirst({
-                 where: { userId: userId, skillId: skillId, timestamp: { lt: startDate } },
-                 orderBy: { timestamp: 'desc' }, select: { score: true }
-             });
-             initialScores[skillId] = lastLogBefore?.score ?? null;
-        }
-        console.log("DEBUG: Initial Scores (before period):", JSON.stringify(initialScores));
-
-        // 5. Aggregate into Time Intervals (Monthly)
-        const history: SkillProgressHistoryPointDto[] = [];
-        let currentIntervalStart = new Date(startDate);
-        const lastKnownScores = { ...initialScores }; // Start with scores from before the period
-
-        console.log("DEBUG: Starting aggregation loop...");
-        while (currentIntervalStart <= endDate) {
-            const nextIntervalStart = new Date(currentIntervalStart);
-            nextIntervalStart.setMonth(currentIntervalStart.getMonth() + 1);
-            const intervalEndTime = nextIntervalStart.getTime(); // End of current interval (exclusive)
-
-            // console.log(`DEBUG: Processing interval starting ${currentIntervalStart.toISOString()} (ends before ${new Date(intervalEndTime).toISOString()})`);
-
-            // Find logs pertaining to this interval [start, end)
-            const logsThisInterval = logs.filter(log => {
-                const ts = log.timestamp.getTime();
-                return ts >= currentIntervalStart.getTime() && ts < intervalEndTime;
-            });
-            // console.log(`DEBUG: Logs found this interval: ${logsThisInterval.length}`);
-
-            // Update last known scores based on the *latest* log within this interval for each skill
-             skillIds.forEach(skillId => {
-                 const logsForSkillThisInterval = logsThisInterval
-                    .filter(log => log.skillId === skillId)
-                    // Sort logs within interval descending by timestamp to easily find the latest
-                    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-                 if (logsForSkillThisInterval.length > 0) {
-                     // console.log(`DEBUG: Found new log for skill ${skillId} in interval. Old score: ${lastKnownScores[skillId]}, New score: ${logsForSkillThisInterval[0].score}`);
-                     lastKnownScores[skillId] = logsForSkillThisInterval[0].score; // Update with latest score from interval
-                 }
-                 // Else: lastKnownScore for this skill remains unchanged (carried forward)
-             });
-
-            // Create data point for the start of this interval using last known scores
-            const pointScores: SkillProgressHistoryPointScoresDto = {};
-            skillIds.forEach(skillId => {
-                const score = lastKnownScores[skillId];
-                const skillInfo = skillMap.get(skillId);
-                const maxScore = skillInfo?.maxScore ?? 10;
-                pointScores[skillId.toString()] = (score !== null && maxScore > 0) ? Math.round((score / maxScore * 100)) : null; // Normalize & Round
-            });
-
-            const dateLabel = currentIntervalStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-            history.push({
-                timestamp: currentIntervalStart.getTime(),
-                dateLabel: dateLabel,
-                scores: pointScores
-            });
-            // console.log(`DEBUG: Added history point for ${dateLabel}:`, JSON.stringify(pointScores));
-
-            currentIntervalStart = nextIntervalStart; // Move to next month's start
-        }
-        console.log("DEBUG: Finished aggregation loop.");
-
-
-        // Ensure at least two points for line chart rendering
-        if (history.length === 1) {
-             console.log("DEBUG: History has only one point, duplicating for line chart.");
-             // Duplicate last point with slightly different timestamp/label for rendering
-             history.push({ ...history[0], timestamp: history[0].timestamp + 1, dateLabel: history[0].dateLabel + '*' });
-        } else if (history.length === 0 && userSkills.length > 0) {
-             console.log("DEBUG: No logs found in period, creating baseline history points.");
-             // If no logs in the last year, create points based on initial scores
-             const pointScores: SkillProgressHistoryPointScoresDto = {};
-             skillIds.forEach(skillId => {
-                 const score = initialScores[skillId];
-                 const skillInfo = skillMap.get(skillId);
-                 const maxScore = skillInfo?.maxScore ?? 10;
-                 pointScores[skillId.toString()] = (score !== null && maxScore > 0) ? Math.round((score / maxScore * 100)) : null;
-             });
-             const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-             const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-             history.push({ timestamp: startDate.getTime(), dateLabel: startLabel, scores: pointScores });
-             history.push({ timestamp: endDate.getTime(), dateLabel: endLabel, scores: { ...pointScores } }); // Create distinct object
-        }
-
-        const result: SkillProgressSummaryDto = { skillNames: skillNamesMap, history };
-        console.log("DEBUG: Returning Progress Summary:", JSON.stringify(result.skillNames), `History points: ${result.history.length}`); // Log final object structure overview
-        return result;
+        console.log("DEBUG: Returning HARDCODED summary data.");
+        return dummyData;
     }
+    // --- END TEMPORARY SIMPLIFIED ---
 
 } // --- END OF CLASS SkillsService ---
