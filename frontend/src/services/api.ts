@@ -238,9 +238,9 @@ export const fetchMemberSkillHistoryAPI = async (teamId: number, memberId: numbe
      return response.data;
 };
 // Fetch function for the personal progress summary chart on the main dashboard
-export const fetchSkillProgressSummary = async (userId: number | string): Promise<SkillProgressSummaryDto> => {
+export const fetchSkillProgressSummary = async (userId: string): Promise<SkillProgressSummaryDto> => {
     const response = await apiClient.get<SkillProgressSummaryDto>('/skills/progress-summary', {
-        params: { userId: String(userId) } // Ensure it's a numerical string
+        params: { userId } // userId is now guaranteed to be string
     });
     return response.data;
 };

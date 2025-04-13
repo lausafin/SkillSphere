@@ -50,7 +50,7 @@ const DashboardPage: React.FC = () => {
     
         Promise.all([
             fetchSkills(),
-            fetchSkillProgressSummary(userId)
+            fetchSkillProgressSummary(String(userId))
         ])
         .then(([skillsData, progressData]) => {
             if (isMounted) {
