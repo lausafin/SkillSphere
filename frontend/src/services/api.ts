@@ -108,13 +108,27 @@ export interface TeamDashboardDto {
 }
 
 // --- History DTOs ---
-// Removed duplicate declaration of MemberSkillHistoryPointScoresDto
-export interface MemberSkillHistoryPointDto { timestamp: number; dateLabel: string; scores: MemberSkillHistoryPointScoresDto; }
-export interface MemberSkillHistoryDto { memberId: number; skillIds: number[]; history: MemberSkillHistoryPointDto[]; }
+export interface SkillProgressHistoryPointScoresDto { // Renamed for clarity below
+    [skillId: string]: number | null;
+}
+// --- Ensure this interface is EXPORTED and named correctly ---
+export interface SkillProgressHistoryPointDto { // Used by both history types below
+    timestamp: number;
+    dateLabel: string;
+    scores: SkillProgressHistoryPointScoresDto; // Use the correct scores type name
+}
+// --- END Ensure ---
+
+// DTO for Member-specific history endpoint response
+export interface MemberSkillHistoryDto {
+    memberId: number;
+    skillIds: number[];
+    history: SkillProgressHistoryPointDto[]; // Uses the common point DTO
+}
 // DTO for Personal Skill History endpoint response
 export interface SkillProgressSummaryDto {
      skillNames: { [skillId: number]: string };
-     history: MemberSkillHistoryPointDto[]; // Corrected to use the existing interface
+     history: SkillProgressHistoryPointDto[]; // Uses the common point DTO
 }
 
 
