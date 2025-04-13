@@ -72,22 +72,23 @@ model Skill {
   id              Int      @id @default(autoincrement())
   name            String
   description     String?
-  categoryId      Int?     // Foreign key to user's personal Category
-  currentScore    Int      @default(0)
+  categoryId      Int?
+  // currentScore    Int      @default(0) // --- REMOVED ---
   maxScore        Int      @default(10)
   ratingScaleType String   @default("numeric")
   createdAt       DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt       DateTime @updatedAt
 
   userId          Int?     // Nullable: For personal skills
   teamId          Int?     // Nullable: For team skills
 
+  // Relations...
   user            User?    @relation("AuthoredSkills", fields: [userId], references: [id], onDelete: Cascade)
   team            Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull) // Category is personal
-  progressLogs    SkillProgressLog[]
-  goals           Goal[]   // TODO: Define goal ownership (personal or team?)
-  tags            SkillTag[] // Tags applied are personal via SkillTag
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  progressLogs    SkillProgressLog[] // Relation to logs IS PRESENT
+  goals           Goal[]
+  tags            SkillTag[]
 
   @@unique([userId, name])
   @@unique([teamId, name])
