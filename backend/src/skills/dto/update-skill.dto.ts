@@ -24,12 +24,12 @@ export class UpdateSkillDto {
     @Type(() => Number)
     categoryId?: number | null; // Allow null to be passed to unset
 
-    @IsOptional()
-    @IsNumber()
-    @Min(0)
-    // Add @Max based on related maxScore? Requires custom validator or service logic check
-    @Type(() => Number)
-    currentScore?: number;
+    // @IsOptional()
+    // @IsNumber()
+    // @Min(0)
+    // // Add @Max based on related maxScore? Requires custom validator or service logic check
+    // @Type(() => Number)
+    // currentScore?: number;
 
     @IsOptional()
     @IsInt()
