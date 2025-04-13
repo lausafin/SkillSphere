@@ -16,7 +16,6 @@ import { Prisma, User } from '@prisma/client'; // Import User type
 interface RegisterDto { email: string; password: string; name?: string; }
 interface LoginDto { email: string; password: string; }
 interface JwtPayload { userId: number; email: string; }
-interface UserProfileDto { id: number; email: string; name?: string; } // Define UserProfileDto
 
 @Injectable()
 export class AuthService {
@@ -54,55 +53,53 @@ export class AuthService {
         };
     }
 
-    // --- register method (Updated) ---
-    async register(registerDto: RegisterDto): Promise<{ accessToken: string; user: UserProfileDto }> { // <-- UPDATED Return Type
+    // Handle registration request
+    async register(registerDto: RegisterDto) {
         const { email, password, name } = registerDto;
 
-        if (!email || !password) { throw new BadRequestException('Email and password are required.'); }
-        // Add DTO validation for production
+        // Input validation (basic example, rely primarily on ValidationPipe/DTOs)
+        if (!email || !password) {
+             throw new BadRequestException('Email and password are required.');
+        }
+        // Add more specific DTO validation using class-validator for production
 
         const saltRounds = 10;
-        let hashedPassword = '';
-        try {
-             hashedPassword = await bcrypt.hash(password, saltRounds);
-        } catch (hashError) {
-             console.error("Bcrypt Error during registration hashing:", hashError);
-             throw new InternalServerErrorException('Error processing password during registration.');
-        }
-
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         try {
-            // Create the user (select necessary fields for login payload generation)
             const newUser = await this.prisma.user.create({
                 data: {
                     email: email.toLowerCase(),
                     passwordHash: hashedPassword,
                     name: name,
                 },
-                select: { id: true, email: true, name: true }, // Select fields needed for login/return DTO
+                select: { id: true, email: true, name: true, createdAt: true },
             });
 
-            // --- Automatically Log In ---
-            // We have the newUser details, generate the payload and sign the token
-            const payload: JwtPayload = { userId: newUser.id, email: newUser.email };
-             const userProfile: UserProfileDto = { id: newUser.id, email: newUser.email, name: newUser.name }; // Construct DTO
-
-            // Return the same structure as the login method
-            return {
-                accessToken: this.jwtService.sign(payload),
-                user: userProfile
-            };
-            // --- End Auto Login ---
+            return { user: newUser };
 
         } catch (error) {
             if (error instanceof Prisma.PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
+                    // Unique constraint violation (email likely)
                     throw new ConflictException(`Email address '${email}' is already registered.`);
                 }
-                console.error(`Prisma Error Code during registration: ${error.code}`, error);
-                throw new InternalServerErrorException('A database error occurred during registration.');
+                 // Log other specific Prisma errors if needed
+                 console.error(`Prisma Error Code during registration: ${error.code}`, error);
+                 // You could potentially map other Prisma codes (like P2003 foreign key constraint)
+                 // to BadRequestException if they relate to invalid input IDs.
+                 throw new InternalServerErrorException('A database error occurred during registration.'); // More specific than generic Error
             }
-            console.error("Unexpected Registration Error:", error);
+
+            // Catch bcrypt errors (less likely)
+             if (error.message.includes('bcrypt')) {
+                console.error("Bcrypt Error during registration:", error);
+                throw new InternalServerErrorException('Error processing password during registration.');
+            }
+
+            // Catch any other unexpected errors
+            console.error("Unexpected Registration Error:", error); // Log the full unknown error
+            // Keep generic internal server error for truly unexpected issues
             throw new InternalServerErrorException('Could not register user due to an unexpected error.');
         }
     }
