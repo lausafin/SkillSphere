@@ -40,8 +40,6 @@ const DashboardPage: React.FC = () => {
             return;
         }
     
-        const userId = user.id; // Now: type = number
-    
         let isMounted = true;
         setIsLoading(true);
         setError(null);
@@ -50,7 +48,7 @@ const DashboardPage: React.FC = () => {
     
         Promise.all([
             fetchSkills(),
-            fetchSkillProgressSummary(String(userId))
+            fetchSkillProgressSummary()
         ])
         .then(([skillsData, progressData]) => {
             if (isMounted) {
