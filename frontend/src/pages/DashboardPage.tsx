@@ -34,11 +34,13 @@ const DashboardPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (user?.id == null) {
-            setError("User ID not found. Please log in again.");
+        if (user?.id === undefined) {
+            setError("User ID is missing. Please log in again.");
             setIsLoading(false);
             return;
         }
+    
+        const userId = user.id; // Now: type = number
     
         let isMounted = true;
         setIsLoading(true);
@@ -48,25 +50,29 @@ const DashboardPage: React.FC = () => {
     
         Promise.all([
             fetchSkills(),
-            fetchSkillProgressSummary(user.id)
-        ]).then(([skillsData, progressData]) => {
+            fetchSkillProgressSummary(userId)
+        ])
+        .then(([skillsData, progressData]) => {
             if (isMounted) {
-                console.log("Fetched Skills:", JSON.stringify(skillsData, null, 2));
-                console.log("Fetched Progress Summary:", JSON.stringify(progressData, null, 2));
+                console.log("Fetched Skills:", skillsData);
+                console.log("Fetched Progress Summary:", progressData);
                 setSkills(skillsData);
                 setSkillProgressData(progressData);
             }
-        }).catch(err => {
+        })
+        .catch(err => {
             if (isMounted) {
                 console.error("Failed to load dashboard data:", err);
                 setError(err.response?.data?.message || 'Failed to load dashboard data.');
             }
-        }).finally(() => {
+        })
+        .finally(() => {
             if (isMounted) setIsLoading(false);
         });
     
         return () => { isMounted = false; };
     }, [user?.id]);
+    
     
 
     // --- Prepare data for Radar Chart ---
