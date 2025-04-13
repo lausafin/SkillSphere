@@ -33,33 +33,41 @@ const DashboardPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true); // Combined loading state
     const [error, setError] = useState<string | null>(null);
 
-    // --- Fetch ALL Dashboard Data ---
     useEffect(() => {
+        if (user?.id == null) {
+            setError("User ID not found. Please log in again.");
+            setIsLoading(false);
+            return;
+        }
+    
         let isMounted = true;
-        setIsLoading(true); setError(null);
-        setSkills([]); setSkillProgressData(null); // Reset data
-
+        setIsLoading(true);
+        setError(null);
+        setSkills([]);
+        setSkillProgressData(null);
+    
         Promise.all([
-            fetchSkills(), // Fetches SkillData[] (includes latestScoreData)
-            fetchSkillProgressSummary() // Fetches SkillProgressSummaryDto
+            fetchSkills(),
+            fetchSkillProgressSummary(user.id)
         ]).then(([skillsData, progressData]) => {
             if (isMounted) {
-                console.log("Fetched Skills:", JSON.stringify(skillsData, null, 2)); // Log raw skills
-                console.log("Fetched Progress Summary:", JSON.stringify(progressData, null, 2)); // Log raw progress
+                console.log("Fetched Skills:", JSON.stringify(skillsData, null, 2));
+                console.log("Fetched Progress Summary:", JSON.stringify(progressData, null, 2));
                 setSkills(skillsData);
                 setSkillProgressData(progressData);
             }
         }).catch(err => {
             if (isMounted) {
-                console.error("Failed to load dashboard data:", err); // Log the full error object
+                console.error("Failed to load dashboard data:", err);
                 setError(err.response?.data?.message || 'Failed to load dashboard data.');
             }
         }).finally(() => {
             if (isMounted) setIsLoading(false);
         });
-
-        return () => { isMounted = false; }; // Cleanup
-    }, []); // Fetch only on mount
+    
+        return () => { isMounted = false; };
+    }, [user?.id]);
+    
 
     // --- Prepare data for Radar Chart ---
     const radarChartData = useMemo(() => {
