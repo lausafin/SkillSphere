@@ -7,8 +7,6 @@ import { SkillsService } from './skills.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Correct path
 // Import the new DTO
 import { SkillProgressSummaryDto } from './dto/skill-progress-summary.dto';
-import { Query } from '@nestjs/common';
-
 
 // Use actual DTO classes
 interface CreateSkillDto { name: string; description?: string; categoryId?: number | null; currentScore?: number; maxScore?: number; ratingScaleType?: string; tags?: string[]; }
@@ -76,9 +74,10 @@ export class SkillsController {
 
     // --- NEW Endpoint for Progress Summary ---
     @Get('progress-summary')
-    getPersonalSkillProgressSummary(@Request() req, @Query() query: any) {
-        console.log('🔍 Raw query:', query); // Log incoming query params
-        return this.skillsService.getPersonalSkillProgressSummary(req.user.userId);
+    getPersonalSkillProgressSummary(@Request() req): Promise<SkillProgressSummaryDto> {
+      console.log('🧠 [GET /progress-summary] req.user =', req.user);
+      console.log('📦 Full req.headers =', req.headers);
+      return this.skillsService.getPersonalSkillProgressSummary(req.user.userId);
     }
     
     // --- END New Endpoint ---
