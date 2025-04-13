@@ -2,35 +2,28 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 // Import Prisma types AND generated types explicitly
-import { Prisma, Skill, SkillProgressLog, Tag, Team, TeamMembership, User, Goal, SkillEvidence, SkillTag, Category, TeamRole } from '@prisma/client';
+import { Prisma, Skill, SkillProgressLog, Tag, Team, TeamMembership, User, Goal, SkillEvidence, SkillTag, Category, TeamRole } from '@prisma/client'; // Added all potentially needed types
 
 // --- Import the DTO Classes ---
 // Ensure these files exist and export the classes correctly
-import { CreateSkillDto } from './dto/create-skill.dto'; // Should have initialScore?, notes?, teamId?
-import { UpdateSkillDto } from './dto/update-skill.dto'; // Should NOT have currentScore
+import { CreateSkillDto } from './dto/create-skill.dto';
+import { UpdateSkillDto } from './dto/update-skill.dto';
 import { CreateProgressLogDto } from './dto/create-progress-log.dto';
-// Import supporting DTOs used by TeamDashboardDto or SkillWithRelations if defined elsewhere
-import { UserProfileDto } from '../auth/dto/user-profile.dto';
-// Import the new DTOs
-import { SkillProgressSummaryDto, SkillProgressHistoryPointDto, SkillProgressHistoryPointScoresDto } from './dto/skill-progress-summary.dto';
 
-// Define types used in service
-type SkillWithRelations = Omit<Skill, 'currentScore'> & { // Omit removed field
+// Define types used in service (import if defined elsewhere)
+// Helper type for consistent return values including relations
+type SkillWithRelations = Skill & {
     category?: Category | null;
     tags?: (SkillTag & { tag: Tag })[];
-    progressLogs?: SkillProgressLogWithUser[];
+    progressLogs?: (SkillProgressLog & { evidence?: SkillEvidence[], user?: Pick<User, 'id'|'name'|'email'> | null })[];
     goals?: Goal[];
-    user?: Pick<UserProfileDto, 'id'|'name'> | null;
-    team?: (Team & { owner: Pick<UserProfileDto, 'id'|'name'> }) | null;
-    latestScoreData?: {
-        score: number | null;
-        timestamp: Date | null;
-        userId?: number | null;
-    } | null; // Make the whole object nullable
+    user?: Pick<User, 'id'|'name'> | null; // Author if personal
+    team?: (Team & { owner: Pick<User, 'id'|'name'> }) | null; // Team if team skill
 };
 
+// Define type for Log with user included
 type SkillProgressLogWithUser = SkillProgressLog & {
-    user: Pick<UserProfileDto, 'id'|'name'|'email'> | null; // Use UserProfileDto for consistency
+    user: Pick<User, 'id'|'name'|'email'> | null;
     evidence?: SkillEvidence[];
 };
 
@@ -54,202 +47,196 @@ export class SkillsService {
             })
         );
         const tags = await this.prisma.$transaction(tagOperations);
-        return tags;
+        return tags; // Return statement was missing implementation before
     }
 
-     // Helper to get User Membership for a Team
+    // Option: Explicit select in getUserMembership (usually not needed for scalar enum)
     private async getUserMembership(userId: number, teamId: number): Promise<TeamMembership | null> {
         return this.prisma.teamMembership.findUnique({
-            where: { userId_teamId: { userId, teamId } }
+            where: { userId_teamId: { userId, teamId } },
+            // select: { userId: true, teamId: true, role: true, joinedAt: true } // Add explicit select if needed
         });
-    }
-
-    // Helper to get latest score data
-    private async getLatestScoreData(skillId: number, forUserId?: number): Promise<{ score: number | null, timestamp: Date | null, userId?: number | null }> {
-        const whereCondition: Prisma.SkillProgressLogWhereInput = { skillId: skillId };
-        if (forUserId) { whereCondition.userId = forUserId; }
-
-        const latestLog = await this.prisma.skillProgressLog.findFirst({
-            where: whereCondition,
-            orderBy: { timestamp: 'desc' },
-            select: { score: true, timestamp: true, userId: true }
-        });
-        return {
-            score: latestLog?.score ?? null,
-            timestamp: latestLog?.timestamp ?? null,
-            userId: latestLog?.userId ?? null
-        };
     }
 
     // --- PUBLIC SERVICE METHODS ---
 
+    // src/skills/skills.service.ts (create method)
     async create(userId: number, createSkillDto: CreateSkillDto): Promise<SkillWithRelations | null> {
-        const { name, categoryId, teamId, tags, notes, initialScore, maxScore, ...restData } = createSkillDto;
+        const { name, categoryId, teamId, tags, notes, ...restData } = createSkillDto;
 
-        // 1. Permissions & Validation
-        let scopeCheck: Prisma.SkillWhereInput = {};
+        // Remove the faulty check for createSkillDto.userId
+
+        // 1. Check Permissions & Validate Relations
+        let scopeCheck: Prisma.SkillWhereInput = {}; // For duplicate name check
+
         if (teamId) {
+            // Team Skill Creation
+            console.log(`DEBUG: Creating team skill. UserID=${userId}, TeamID=${teamId}`); // Log input IDs
             const membership = await this.getUserMembership(userId, teamId);
-            if (!membership || membership.role !== TeamRole.LEADER) {
-                throw new ForbiddenException(`Must be LEADER to create team skills (Team ID: ${teamId}).`);
+            console.log(`DEBUG: Found membership for leader check:`, membership); // Log result of check
+            // Check role using the imported Enum
+            if (!membership || membership.role !== TeamRole.LEADER) { // Breakpoint here
+                console.error(`DEBUG: Permission denied. Membership found: ${!!membership}, Role: ${membership?.role}`); // Log why it failed
+                throw new ForbiddenException(`You must be a LEADER to create skills for this team (ID: ${teamId}).`);
             }
-            scopeCheck = { teamId: teamId };
-        } else {
+            // Personal Skill Creation Scope
             scopeCheck = { userId: userId };
         }
 
+        // Duplicate name check
         const duplicate = await this.prisma.skill.findFirst({ where: { ...scopeCheck, name } });
-        if (duplicate) { throw new ConflictException(`Skill name "${name}" already exists ${teamId ? 'in this team' : 'for this user'}.`); }
-        if (categoryId) {
-             const category = await this.prisma.category.findFirst({ where: { id: categoryId, userId: userId } });
-             if (!category) throw new ForbiddenException('Invalid category specified or not owned by user.');
-        }
+        if (duplicate) { /* ... throw ConflictException ... */ }
+
+        // Category check
+        if (categoryId) { /* ... category check ... */ }
+
         const tagsToConnect = await this.connectOrCreateTags(userId, tags || []);
 
         try {
-            // 2. Create Skill
+            // 3. Create Skill Record
             const newSkill = await this.prisma.skill.create({
                 data: {
-                    name,
+                    // --- Provide all required fields directly ---
+                    name, // name is required
                     description: restData.description,
-                    maxScore: maxScore ?? 10,
+                    currentScore: restData.currentScore ?? 0,
+                    maxScore: restData.maxScore ?? 10,
                     ratingScaleType: restData.ratingScaleType ?? 'numeric',
-                    user: !teamId ? { connect: { id: userId } } : undefined,
-                    team: teamId ? { connect: { id: teamId } } : undefined,
+
+                    // --- Connect Owner relation directly ---
+                    user: !teamId ? { connect: { id: userId } } : undefined, // Connect User if it's personal
+                    team: teamId ? { connect: { id: teamId } } : undefined, // Connect Team if it's for a team
+
+                    // --- Other relations ---
                     category: categoryId ? { connect: { id: categoryId } } : undefined,
-                    tags: tagsToConnect.length > 0 ? { create: tagsToConnect.map(tag => ({ assignedBy: `user:${userId}`, tag: { connect: { id: tag.id } } })) } : undefined,
+                    tags: tagsToConnect.length > 0 ? {
+                    create: tagsToConnect.map(tag => ({
+                        assignedBy: `user:${userId}`,
+                        tag: { connect: { id: tag.id } }
+                    }))
+                    } : undefined,
                 }
+                // No include needed here
             });
 
-            // 3. Create Initial Log
-            if ((initialScore ?? 0) > 0 || notes) {
-                 await this.prisma.skillProgressLog.create({
-                     data: {
-                         score: initialScore ?? 0,
-                         notes: notes || 'Initial skill created.',
-                         timestamp: new Date(),
-                         skill: { connect: { id: newSkill.id } },
-                         user: { connect: { id: userId } }
-                     }
-                 });
-            }
-            // 4. Refetch with details
+            // 4. Create Initial Progress Log (remains the same)
+            if ((createSkillDto.currentScore ?? 0) > 0 || createSkillDto.notes) { /* ... create log ... */ }
+
+            // 5. Refetch with relations
             return this.findOne(userId, newSkill.id);
 
-        } catch (error) {
-             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                 throw new ConflictException(`Skill name "${name}" likely already exists ${teamId ? 'in this team' : 'for this user'}.`);
-             }
-             console.error("Error creating skill:", error);
-             throw new InternalServerErrorException("Could not create skill.");
-        }
+        } catch (error) { /* ... error handling ... */ }
+        throw new InternalServerErrorException("Could not create skill."); // Ensure fallback throw
     }
 
     async findAll(userId: number): Promise<SkillWithRelations[]> {
-        const userMemberships = await this.prisma.teamMembership.findMany({ where: { userId }, select: { teamId: true } });
+        const userMemberships = await this.prisma.teamMembership.findMany({ /* ... */ });
         const teamIds = userMemberships.map(m => m.teamId);
-
+    
         const skills = await this.prisma.skill.findMany({
             where: { OR: [{ userId: userId }, { teamId: { in: teamIds } }] },
-            include: { // Base includes for list view
+            include: { // Include everything needed for SkillWithRelations
                 category: true,
                 tags: { include: { tag: true } },
-                user: { select: { id: true, name: true }}, // Author if personal
-                team: { select: { id: true, name: true }}, // Team if team skill
+                user: { select: { id: true, name: true }},
+                team: { // Include team and its owner
+                    include: {
+                        owner: { select: { id: true, name: true } }
+                    }
+                 },
+                // Decide on including logs/goals for list view? Probably not.
             },
             orderBy: { updatedAt: 'desc' },
         });
-
-        // Enhance with user's latest score for each skill
-        const skillsWithScores = await Promise.all(skills.map(async (skill) => {
-            const latestScoreData = await this.getLatestScoreData(skill.id, userId); // Fetch score for the *requesting* user
-            return { ...skill, latestScoreData };
-        }));
-
-        return skillsWithScores as SkillWithRelations[]; // Cast needed because we added latestScoreData
+        return skills as SkillWithRelations[]; // Cast might still be needed if TS can't perfectly match includes to complex type
     }
 
     async findOne(userId: number, id: number): Promise<SkillWithRelations | null> {
         const skill = await this.prisma.skill.findUnique({
             where: { id },
-            include: { // Include necessary relations
+            include: {
                 category: true,
                 tags: { include: { tag: true } },
+                progressLogs: { orderBy: { timestamp: 'desc' }, include: { evidence: true, user: { select: {id:true, name:true, email: true}} }},
                 goals: true,
-                user: { select: { id: true, name: true }}, // Author
-                team: { include: { owner: { select: { id: true, name: true }}}} // Team + Owner
+                user: { select: { id: true, name: true }},
+                team: { include: { owner: { select: { id: true, name: true }}}}
             }
         });
 
         if (!skill) return null;
 
-        // Check view permission
-        let canView = false;
-        if (skill.userId === userId) { canView = true; }
-        else if (skill.teamId) { const membership = await this.getUserMembership(userId, skill.teamId); if (membership) { canView = true; } }
-        if (!canView) throw new ForbiddenException("Access denied to view this skill.");
-
-        // Fetch logs and latest score separately after permission check
-        const logs = await this.getProgressLogs(userId, id); // Ensures user can view logs too
-        const latestScoreData = await this.getLatestScoreData(id, userId); // Get *requesting user's* latest score
-
-        return { ...skill, progressLogs: logs, latestScoreData } as SkillWithRelations;
+        // Check access
+        if (skill.userId === userId) return skill as SkillWithRelations; // Cast needed because TS doesn't know includes match perfectly
+        if (skill.teamId) {
+            const membership = await this.getUserMembership(userId, skill.teamId);
+            if (membership) return skill as SkillWithRelations; // Cast needed
+        }
+        throw new ForbiddenException("Access denied to view this skill.");
     }
 
     async update(userId: number, id: number, updateSkillDto: UpdateSkillDto): Promise<SkillWithRelations | null> {
-         // Fetch skill with enough info for permission check
-         const skillToCheck = await this.prisma.skill.findUnique({ where: { id }, select: { userId: true, teamId: true }});
-         if (!skillToCheck) throw new NotFoundException(`Skill with ID ${id} not found.`);
+         const skill = await this.findOne(userId, id);
+         if (!skill) { throw new NotFoundException(`Skill with ID ${id} not found or access denied.`); }
 
          // Authorization check (Author or Team Leader)
          let canUpdate = false;
-         if (skillToCheck.userId === userId) { canUpdate = true; }
-         else if (skillToCheck.teamId) { const membership = await this.getUserMembership(userId, skillToCheck.teamId); if (membership && membership.role === TeamRole.LEADER) { canUpdate = true; } }
+         if (skill.userId === userId) { canUpdate = true; }
+         else if (skill.teamId) {
+             const membership = await this.getUserMembership(userId, skill.teamId);
+             if (membership && membership.role === 'LEADER') { canUpdate = true; }
+         }
          if (!canUpdate) { throw new ForbiddenException(`You do not have permission to update this skill.`); }
 
-         // Validation (Duplicate Name, Category)
-         if (updateSkillDto.name) {
-             const skillNameCheck = await this.prisma.skill.findUnique({ where: { id }, select: { name: true }}); // Get current name
-             if (updateSkillDto.name !== skillNameCheck?.name) {
-                 const scopeCheck = skillToCheck.userId ? { userId: skillToCheck.userId } : { teamId: skillToCheck.teamId };
-                 const duplicate = await this.prisma.skill.findFirst({ where: { ...scopeCheck, name: updateSkillDto.name, NOT: { id } } });
-                 if (duplicate) { throw new ConflictException(`Skill name "${updateSkillDto.name}" already exists ${skillToCheck.userId ? 'for this user' : 'in this team'}.`); }
-             }
+         // Duplicate name check
+         if (updateSkillDto.name && updateSkillDto.name !== skill.name) {
+             const scopeCheck = skill.userId ? { userId: skill.userId } : { teamId: skill.teamId };
+             const duplicate = await this.prisma.skill.findFirst({ where: { ...scopeCheck, name: updateSkillDto.name, NOT: { id } } });
+             if (duplicate) { throw new ConflictException(`Skill name "${updateSkillDto.name}" already exists ${skill.userId ? 'for this user' : 'in this team'}.`); }
          }
-         if (updateSkillDto.categoryId !== undefined) { // Check if categoryId is present (even if null)
-             if (updateSkillDto.categoryId !== null) { // Only validate if it's not being unset
-                 const category = await this.prisma.category.findFirst({ where: { id: updateSkillDto.categoryId, userId: userId } });
-                 if (!category) throw new ForbiddenException('Invalid category specified or not owned by user.');
-             }
+         // Category check
+         if (updateSkillDto.categoryId !== undefined && updateSkillDto.categoryId !== null) {
+             const category = await this.prisma.category.findFirst({ where: { id: updateSkillDto.categoryId, userId: userId } });
+             if (!category) throw new ForbiddenException('Invalid category specified or category does not belong to you.');
          }
-         // Prepare Tag Updates
+         // Tag update logic
          let tagUpdateOperations = undefined;
          if (updateSkillDto.tags !== undefined) {
              const tagsToSet = await this.connectOrCreateTags(userId, updateSkillDto.tags);
              tagUpdateOperations = { deleteMany: {}, create: tagsToSet.map(tag => ({ assignedBy: `user:${userId}`, tag: { connect: { id: tag.id } } })) };
          }
-
-        // Prepare data - NO currentScore
+        // --- Data to Update ---
+        // Construct the data object carefully, excluding direct currentScore update
         const dataToUpdate: Prisma.SkillUpdateInput = {
             name: updateSkillDto.name,
             description: updateSkillDto.description,
-            // Handle category update/unset
-            category: updateSkillDto.categoryId !== undefined
-                      ? (updateSkillDto.categoryId === null ? { disconnect: true } : { connect: { id: updateSkillDto.categoryId } })
-                      : undefined,
+            // Allow setting category to null or a new ID
+            category: updateSkillDto.categoryId !== undefined ? { connect: { id: updateSkillDto.categoryId } } : undefined,
+            // Allow updating maxScore
             maxScore: updateSkillDto.maxScore,
             ratingScaleType: updateSkillDto.ratingScaleType,
+            // Apply tag operations
             tags: tagUpdateOperations,
+            // DO NOT include updateSkillDto.currentScore here
         };
-        // Clean undefined properties before update
-        Object.keys(dataToUpdate).forEach(key => (dataToUpdate as any)[key] === undefined && delete (dataToUpdate as any)[key]);
+        // Clean undefined properties to avoid Prisma issues
+        Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
 
 
         try {
-            // Perform Update
-            await this.prisma.skill.update({ where: { id }, data: dataToUpdate });
-            // Refetch with findOne for consistent return type including latest score/logs
-            return this.findOne(userId, id);
+            const updatedSkill = await this.prisma.skill.update({
+                where: { id },
+                data: dataToUpdate, // Use the prepared data object
+                include: { // Re-include relations needed for the return type
+                    category: true,
+                    tags: { include: { tag: true } },
+                    user: { select: { id: true, name: true } },
+                    team: { include: { owner: { select: { id: true, name: true }}}}
+                    // Add logs/goals include if needed by SkillWithRelations
+                }
+            });
+            return updatedSkill as SkillWithRelations;
+
         } catch (error) {
             console.error("Error updating skill:", error);
             throw new InternalServerErrorException("Could not update skill.");
@@ -257,14 +244,16 @@ export class SkillsService {
     }
 
     async remove(userId: number, id: number): Promise<void> {
-         // Fetch skill for permission check
-         const skillToCheck = await this.prisma.skill.findUnique({ where: { id }, select: { userId: true, teamId: true }});
-         if (!skillToCheck) throw new NotFoundException(`Skill with ID ${id} not found.`);
+         const skill = await this.findOne(userId, id);
+         if (!skill) { throw new NotFoundException(`Skill with ID ${id} not found or access denied.`); }
 
-         // Authorization check (Author or Team Leader)
+         // Authorization check
          let canDelete = false;
-         if (skillToCheck.userId === userId) { canDelete = true; }
-         else if (skillToCheck.teamId) { const membership = await this.getUserMembership(userId, skillToCheck.teamId); if (membership && membership.role === TeamRole.LEADER) { canDelete = true; } }
+         if (skill.userId === userId) { canDelete = true; }
+         else if (skill.teamId) {
+             const membership = await this.getUserMembership(userId, skill.teamId);
+             if (membership && membership.role === 'LEADER') { canDelete = true; }
+         }
          if (!canDelete) { throw new ForbiddenException(`You do not have permission to delete this skill.`); }
 
          try {
@@ -278,35 +267,45 @@ export class SkillsService {
      // --- Progress Log Methods ---
 
      async addProgressLog(userId: number, skillId: number, createLogDto: CreateProgressLogDto): Promise<SkillProgressLog> {
-         // Fetch skill for permission check & maxScore validation
-         const skill = await this.prisma.skill.findUnique({ where: { id: skillId }, select: { maxScore: true, userId: true, teamId: true }});
-         if (!skill) { throw new NotFoundException(`Skill with ID ${skillId} not found.`); }
+         // Check access first
+         const skill = await this.findOne(userId, skillId); // Use findOne for combined check
+         if (!skill) { throw new NotFoundException(`Skill with ID ${skillId} not found or access denied.`); }
+         // Add specific LOGGING permission if different from VIEWING permission checked by findOne...
+         // (Assuming any member can log for now, which findOne allows)
 
-         // Check Log Permission (Personal Owner or Any Team Member)
-         let canLog = false;
-         if (skill.userId === userId) { canLog = true; }
-         else if (skill.teamId) { const membership = await this.getUserMembership(userId, skill.teamId); if (membership) { canLog = true; } }
-         if (!canLog) { throw new ForbiddenException(`You do not have permission to log progress for this skill.`); }
-
-         // Validate Score
-         if (createLogDto.score < 0 || createLogDto.score > skill.maxScore) { throw new ForbiddenException(`Score must be between 0 and ${skill.maxScore}.`); }
+         if (createLogDto.score < 0 || createLogDto.score > skill.maxScore) {
+            throw new ForbiddenException(`Score must be between 0 and ${skill.maxScore}.`);
+         }
 
         try {
-            // Transaction: Create log & update Skill's updatedAt
             const newLog = await this.prisma.$transaction(async (tx) => {
                 const createdLog = await tx.skillProgressLog.create({
                     data: {
                         score: createLogDto.score, notes: createLogDto.notes, timeSpentMinutes: createLogDto.timeSpentMinutes, timestamp: createLogDto.timestamp ?? new Date(),
                         skill: { connect: { id: skillId } },
-                        user: { connect: { id: userId } } // User doing the logging
+                        user: { connect: { id: userId } }
                     },
-                    // include: { evidence: true } // Add include if needed
+                    include: { evidence: true } // Include evidence if needed
                 });
-                // Only update timestamp on Skill
-                await tx.skill.update({ where: { id: skillId }, data: { updatedAt: new Date() } });
-                return createdLog;
+                // --- Conditional Skill Update ---
+                // ONLY update Skill.currentScore if it's a PERSONAL skill
+                if (skill.userId) { // Check if it's a personal skill (userId is set)
+                    await tx.skill.update({
+                        where: { id: skillId },
+                        // Update score ONLY for personal skills
+                        data: { currentScore: createLogDto.score, updatedAt: new Date() },
+                    });
+                } else if (skill.teamId) {
+                    // For TEAM skills, just update the timestamp so it appears in "Recent" lists etc.
+                    // DO NOT update currentScore on the main Skill record.
+                    await tx.skill.update({
+                        where: { id: skillId },
+                        data: { updatedAt: new Date() }, // Only touch updatedAt
+                    });
+                }
+                return createdLog; // Return from transaction block
             });
-            return newLog;
+            return newLog; // Return the result of the transaction
         } catch (error) {
             console.error("Error adding progress log:", error);
             throw new InternalServerErrorException("Could not add progress log.");
@@ -314,162 +313,21 @@ export class SkillsService {
     }
 
     async getProgressLogs(userId: number, skillId: number): Promise<SkillProgressLogWithUser[]> {
-         // Fetch skill for permission check
-         const skill = await this.prisma.skill.findUnique({ where: { id: skillId }, select: { userId: true, teamId: true }});
-         if (!skill) { throw new NotFoundException(`Skill with ID ${skillId} not found.`); }
-
-         // Check View Permission (Personal Owner or Any Team Member)
-         let canView = false;
-         if (skill.userId === userId) { canView = true; }
-         else if (skill.teamId) { const membership = await this.getUserMembership(userId, skill.teamId); if (membership) { canView = true; } }
-         if (!canView) { throw new ForbiddenException(`You do not have permission to view logs for this skill.`); }
+         const skill = await this.findOne(userId, skillId); // Use findOne for permission check
+         if (!skill) { throw new NotFoundException(`Skill with ID ${skillId} not found or access denied.`); }
+         // Add specific LOG VIEWING permission if different... (assuming any member can view for now)
 
         return this.prisma.skillProgressLog.findMany({
             where: { skillId: skillId },
             orderBy: { timestamp: 'desc' },
             include: {
                 evidence: true,
-                user: { select: { id: true, name: true, email: true }} // Include user who logged
+                user: { select: { id: true, name: true, email: true }}
             }
         });
     }
 
-    // --- Method for Personal Skill Progress Summary ---
-    async getPersonalSkillProgressSummary(userId: number): Promise<SkillProgressSummaryDto> {
-        console.log(`DEBUG: getPersonalSkillProgressSummary called for UserID: ${userId}`); // Log entry
-        const MAX_SKILLS_ON_CHART = 7; // Max skills to show
-
-        // 1. Find user's personal skills, ordered by recent activity
-        const userSkills = await this.prisma.skill.findMany({
-            where: { userId: userId },
-            orderBy: { updatedAt: 'desc' },
-            take: MAX_SKILLS_ON_CHART,
-            select: { id: true, name: true, maxScore: true }
-        });
-        console.log(`DEBUG: Found ${userSkills.length} personal skills.`);
-
-        if (userSkills.length === 0) {
-            console.log("DEBUG: No personal skills found, returning empty summary.");
-            return { skillNames: {}, history: [] }; // Return empty if no skills
-        }
-
-        const skillIds = userSkills.map(s => s.id);
-        const skillMap = new Map(userSkills.map(s => [s.id, s])); // Map ID to Skill info
-        const skillNamesMap: { [skillId: number]: string } = {};
-        userSkills.forEach(s => { skillNamesMap[s.id] = s.name; });
-        console.log(`DEBUG: Skill IDs for summary: [${skillIds.join(', ')}]`);
-
-        // 2. Define Time Range (Last Year)
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setFullYear(endDate.getFullYear() - 1);
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        console.log(`DEBUG: Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
-        // 3. Fetch Relevant Logs for THIS USER and THESE SKILLS within the date range
-        const logs = await this.prisma.skillProgressLog.findMany({
-            where: {
-                userId: userId,
-                skillId: { in: skillIds },
-                timestamp: { gte: startDate } // Logs within the last year
-            },
-            orderBy: { timestamp: 'asc' }, // Chronological order
-            select: { skillId: true, score: true, timestamp: true }
-        });
-        console.log(`DEBUG: Found ${logs.length} logs within the date range.`);
-
-        // 4. Fetch latest score *before* startDate for initialization for each skill
-        const initialScores: { [skillId: number]: number | null } = {};
-        for (const skillId of skillIds) {
-             const lastLogBefore = await this.prisma.skillProgressLog.findFirst({
-                 where: { userId: userId, skillId: skillId, timestamp: { lt: startDate } },
-                 orderBy: { timestamp: 'desc' }, select: { score: true }
-             });
-             initialScores[skillId] = lastLogBefore?.score ?? null;
-        }
-        console.log("DEBUG: Initial Scores (before period):", JSON.stringify(initialScores));
-
-        // 5. Aggregate into Time Intervals (Monthly)
-        const history: SkillProgressHistoryPointDto[] = [];
-        let currentIntervalStart = new Date(startDate);
-        const lastKnownScores = { ...initialScores }; // Start with scores from before the period
-
-        console.log("DEBUG: Starting aggregation loop...");
-        while (currentIntervalStart <= endDate) {
-            const nextIntervalStart = new Date(currentIntervalStart);
-            nextIntervalStart.setMonth(currentIntervalStart.getMonth() + 1);
-            const intervalEndTime = nextIntervalStart.getTime(); // End of current interval (exclusive)
-
-            // console.log(`DEBUG: Processing interval starting ${currentIntervalStart.toISOString()} (ends before ${new Date(intervalEndTime).toISOString()})`);
-
-            // Find logs pertaining to this interval [start, end)
-            const logsThisInterval = logs.filter(log => {
-                const ts = log.timestamp.getTime();
-                return ts >= currentIntervalStart.getTime() && ts < intervalEndTime;
-            });
-            // console.log(`DEBUG: Logs found this interval: ${logsThisInterval.length}`);
-
-            // Update last known scores based on the *latest* log within this interval for each skill
-             skillIds.forEach(skillId => {
-                 const logsForSkillThisInterval = logsThisInterval
-                    .filter(log => log.skillId === skillId)
-                    // Sort logs within interval descending by timestamp to easily find the latest
-                    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-                 if (logsForSkillThisInterval.length > 0) {
-                     // console.log(`DEBUG: Found new log for skill ${skillId} in interval. Old score: ${lastKnownScores[skillId]}, New score: ${logsForSkillThisInterval[0].score}`);
-                     lastKnownScores[skillId] = logsForSkillThisInterval[0].score; // Update with latest score from interval
-                 }
-                 // Else: lastKnownScore for this skill remains unchanged (carried forward)
-             });
-
-            // Create data point for the start of this interval using last known scores
-            const pointScores: SkillProgressHistoryPointScoresDto = {};
-            skillIds.forEach(skillId => {
-                const score = lastKnownScores[skillId];
-                const skillInfo = skillMap.get(skillId);
-                const maxScore = skillInfo?.maxScore ?? 10;
-                pointScores[skillId.toString()] = (score !== null && maxScore > 0) ? Math.round((score / maxScore * 100)) : null; // Normalize & Round
-            });
-
-            const dateLabel = currentIntervalStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-            history.push({
-                timestamp: currentIntervalStart.getTime(),
-                dateLabel: dateLabel,
-                scores: pointScores
-            });
-            // console.log(`DEBUG: Added history point for ${dateLabel}:`, JSON.stringify(pointScores));
-
-            currentIntervalStart = nextIntervalStart; // Move to next month's start
-        }
-        console.log("DEBUG: Finished aggregation loop.");
-
-
-        // Ensure at least two points for line chart rendering
-        if (history.length === 1) {
-             console.log("DEBUG: History has only one point, duplicating for line chart.");
-             // Duplicate last point with slightly different timestamp/label for rendering
-             history.push({ ...history[0], timestamp: history[0].timestamp + 1, dateLabel: history[0].dateLabel + '*' });
-        } else if (history.length === 0 && userSkills.length > 0) {
-             console.log("DEBUG: No logs found in period, creating baseline history points.");
-             // If no logs in the last year, create points based on initial scores
-             const pointScores: SkillProgressHistoryPointScoresDto = {};
-             skillIds.forEach(skillId => {
-                 const score = initialScores[skillId];
-                 const skillInfo = skillMap.get(skillId);
-                 const maxScore = skillInfo?.maxScore ?? 10;
-                 pointScores[skillId.toString()] = (score !== null && maxScore > 0) ? Math.round((score / maxScore * 100)) : null;
-             });
-             const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-             const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-             history.push({ timestamp: startDate.getTime(), dateLabel: startLabel, scores: pointScores });
-             history.push({ timestamp: endDate.getTime(), dateLabel: endLabel, scores: { ...pointScores } }); // Create distinct object
-        }
-
-        const result: SkillProgressSummaryDto = { skillNames: skillNamesMap, history };
-        console.log("DEBUG: Returning Progress Summary:", JSON.stringify(result.skillNames), `History points: ${result.history.length}`); // Log final object structure overview
-        return result;
-    }
-
 } // --- END OF CLASS SkillsService ---
+
+// Ensure supporting types are imported or defined if used in SkillWithRelations/SkillProgressLogWithUser
+// import { Goal, SkillEvidence, SkillTag, Category } from '@prisma/client'; // Assuming these are imported

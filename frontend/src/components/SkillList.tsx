@@ -9,9 +9,9 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import SortIcon from '@mui/icons-material/Sort';
 
-import SkillCard from './SkillCard'; // Import SkillCard
+import SkillCard, { SkillData } from './SkillCard'; // Import SkillCard and updated SkillData type
 import {
-    SkillData, fetchSkills, deleteSkill, fetchCategories, fetchTags, fetchUserTeams, UserTeamListItem, TeamRole // Import TeamRole
+    fetchSkills, deleteSkill, fetchCategories, fetchTags, fetchUserTeams, UserTeamListItem, TeamRole // Import TeamRole
 } from '../services/api';
 import AddEditSkillModal from './AddEditSkillModal';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog';
