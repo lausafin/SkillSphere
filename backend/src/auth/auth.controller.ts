@@ -13,6 +13,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard'; // Corrected path assump
 // Interfaces for example
 interface RegisterDto { email: string; password: string; name?: string; }
 interface LoginDto { email: string; password: string; }
+interface UserProfileDto { id: number; email: string; name?: string; } // Define UserProfileDto
+interface AuthResponse { accessToken: string; user: UserProfileDto; }
 
 @Controller('auth')
 export class AuthController {
@@ -29,10 +31,9 @@ export class AuthController {
 
     @Post('register')
     @HttpCode(HttpStatus.CREATED)
-     // Apply validation pipe if using DTO classes with decorators
     // @UsePipes(new ValidationPipe({ whitelist: true }))
-    async register(@Body() registerDto: RegisterDto) {
-        // Service now throws ConflictException or InternalServerErrorException on failure
+    async register(@Body() registerDto: RegisterDto): Promise<AuthResponse> { // <-- UPDATED return type
+        // Service now returns token and user upon successful registration
         return this.authService.register(registerDto);
     }
 

@@ -106,18 +106,24 @@ export interface SkillData extends BaseSkillDto {
 // === API Service Functions ===
 
 // --- Authentication ---
-export interface AuthResponse { accessToken: string; user: UserProfileDto; }
-export interface LoginDto { email: string; password: string; }
+export interface AuthResponse { accessToken: string; user: UserProfileDto; } // Ensure this is exported
 export interface RegisterDto { email: string; password: string; name?: string; }
+export interface UserProfileDto { id: number; name: string | null; email: string; }
+export interface LoginDto { email: string; password: string; }
 
 export const loginUser = async (credentials: LoginDto): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
     return response.data;
 };
-export const registerUser = async (details: RegisterDto): Promise<{ user: UserProfileDto }> => {
-    const response = await apiClient.post<{ user: UserProfileDto }>('/auth/register', details);
-    return response.data;
+
+// --- UPDATE registerUser function signature and return type ---
+export const registerUser = async (details: RegisterDto): Promise<AuthResponse> => { // <-- Change return type here
+    // Backend now returns { accessToken: '...', user: {...} } on successful registration
+    const response = await apiClient.post<AuthResponse>('/auth/register', details); // <-- Expect AuthResponse
+    return response.data; // Return the full response data
 };
+// --- END UPDATE ---
+
 export const fetchProfile = async (): Promise<UserProfileDto> => {
     const response = await apiClient.get<UserProfileDto>('/auth/profile');
     return response.data;

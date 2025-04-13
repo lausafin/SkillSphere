@@ -2,7 +2,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import { AxiosError } from 'axios'; // Import AxiosError for type checking
 // Assuming your API service exists and has auth functions
-import apiClient, { fetchProfile, loginUser, registerUser } from '../services/api'; // Adjust import path
+import apiClient, { fetchProfile, loginUser, registerUser, AuthResponse } from '../services/api';
 
 // Define the shape of the user object
 interface User { id: number; email: string; name?: string | null; }
@@ -101,23 +101,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    // --- Updated register function ---
     const register = async (details: RegisterDto) => {
         setError(null); setIsLoading(true);
         try {
-            // Assuming registerUser API call now potentially throws specific errors handled by getApiErrorMessage
-            await registerUser(details);
-            // Registration successful: Clear error (implicitly done above)
-            // Let the component handle showing success (e.g., RegisterPage shows the success message)
-        } catch (err: unknown) { // Catch unknown type
+            // Register API now returns the same structure as login on success
+            const { accessToken, user: registeredUser }: AuthResponse = await registerUser(details);
+
+            // Set state immediately to log the user in
+            localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
+            setToken(accessToken);
+            setUser(registeredUser); // Set the user state
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+            // No error means success
+            // Navigation will be handled by components reacting to isAuthenticated change
+
+        } catch (err: unknown) {
             console.error("Register context error:", err);
-            const message = getApiErrorMessage(err); // Use helper function
+            const message = getApiErrorMessage(err);
             setError(message);
              throw new Error(message); // Re-throw for component handling
         } finally {
              setIsLoading(false);
         }
     };
-
+    // --- End Updated register function ---
     const logout = () => { /* ... no changes needed here ... */
         setError(null); setUser(null); setToken(null); localStorage.removeItem(AUTH_TOKEN_KEY); delete apiClient.defaults.headers.common['Authorization'];
     };

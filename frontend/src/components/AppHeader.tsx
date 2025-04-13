@@ -24,7 +24,7 @@ const AppHeader: React.FC = () => {
         <AppBar position="static">
             <Toolbar>
                 {/* App Title/Logo */}
-                <Typography variant="h6" component={NavLink} to={isAuthenticated ? "/dashboard" : "/login"} sx={{ flexGrow: 1, color: 'inherit', textDecoration: 'none' }}>
+                <Typography variant="h6" component={NavLink} to={isAuthenticated ? "/dashboard" : "/welcome"} sx={{ flexGrow: 1, color: 'inherit', textDecoration: 'none' }}>
                     SkillSphere
                 </Typography>
 
