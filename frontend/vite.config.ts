@@ -20,15 +20,3 @@ const viteConfig = defineViteConfig({
     outDir: 'dist',
   },
 });
-
-// Define the Vitest-specific configuration
-const vitestConfig = defineVitestConfig({
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/setupTests.ts',
-  },
-});
-
-// Merge the two configurations and export the result
-export default mergeConfig(viteConfig, vitestConfig);
