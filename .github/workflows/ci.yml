@@ -1,0 +1,50 @@
+# .github/workflows/ci.yml
+
+name: 'Run Tests & Checks'
+
+# This controls WHEN the workflow runs.
+on:
+  # Run on pushes to the 'main' or 'master' branch
+  push:
+    branches: [ main, master ]
+  # Run on any new Pull Request
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-lint:
+    name: 'Test and Lint'
+    runs-on: ubuntu-latest # Use a standard Linux environment
+
+    steps:
+      # Step 1: Check out your repository code
+      - name: 'Checkout Code'
+        uses: actions/checkout@v4
+
+      # Step 2: Set up the correct version of Node.js
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use a modern, stable version of Node.js
+          cache: 'npm' # Speed up future runs by caching dependencies
+
+      # Step 3: Install all project dependencies
+      - name: 'Install Dependencies'
+        run: npm install
+
+      # Step 4: Generate Prisma Client (needed for some tests or checks)
+      # We provide a dummy DATABASE_URL because 'generate' doesn't need a real one.
+      - name: 'Generate Prisma Client'
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://user:pass@host:port/db"
+
+      # Step 5: Run the full test suite
+      # The '-- --run' is crucial. It passes the '--run' flag to Vitest,
+      # which tells it to exit after running tests instead of staying in "watch mode".
+      - name: 'Run Test Suite'
+        run: npm test -- --run
+
+      # Step 6 (Optional but Recommended): Run the linter
+      - name: 'Run ESLint'
+        run: npm run lint
