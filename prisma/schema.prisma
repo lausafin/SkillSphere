@@ -19,11 +19,10 @@ enum TeamRole {
 model User {
   id            Int      @id @default(autoincrement())
   email         String   @unique
-  passwordHash  String
   name          String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
+  passkeys      Passkey[]
   ownedTeams    Team[]             @relation("OwnedTeams")
   memberships   TeamMembership[]
   authoredSkills Skill[]           @relation("AuthoredSkills")
@@ -158,4 +157,15 @@ model SkillTag { // Links a user's personal tag to a skill (personal or team)
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([skillId, tagId])
+}
+
+model Passkey {
+  id              String  @id @unique
+  userId          Int
+  publicKey       Bytes
+  counter         BigInt
+  transports      String? // e.g., "internal,hybrid"
+
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
 }
